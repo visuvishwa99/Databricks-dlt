@@ -2,6 +2,19 @@ bundle:
   name: lexia_streaming
   databricks_cli_version: ">= 1.11.0"
 
+sync:
+  exclude:
+    - docs/**
+    - tests/**
+    - scripts/**
+    - sample_exports/**
+    - sql/**
+    - .github/**
+    - README.md
+    - requirements-dev.txt
+    - pytest.ini
+    - ruff.toml
+
 variables:
   catalog:
     description: Unity Catalog destination catalog

@@ -11,9 +11,9 @@ Evidence date: October 22, 2026 America/Phoenix (October 23 UTC). Results apply 
 | Hardened pipeline execution | [Job run 82045733873178](https://dbc-7f4188e4-3fd1.cloud.databricks.com/jobs/250557649698066/runs/82045733873178?o=7474652460637329), TERMINATED SUCCESS |
 | Earlier baseline execution | Run 167012210378212, two bronze/current silver/daily gold rows, zero quarantine, one OK manifest |
 | Workspace data checks | [Machine-readable smoke evidence](demo-smoke-evidence.json), produced by scripts/smoke_test.py |
-| Hosted Spark and SQL tests | [Successful CI run 39909123930](https://github.com/visuvishwa99/Databricks-dlt/actions/runs/39909123930): 20 application/contract tests and 7 SQL transaction tests at commit a60a9b9 |
+| Hosted Spark and SQL tests | [Successful CI run 39910065820](https://github.com/visuvishwa99/Databricks-dlt/actions/runs/39910065820): 22 application/contract/generator tests and 8 SQL transaction tests at commit 88281bb |
 | Local Spark | 20 tests passed with local Spark 4.0.1; CI uses pinned Spark 3.5.9 on Python 3.11/Java 17 |
-| SQL replay and failure behavior | Real SQL Server 2022 service: same-run replay, duplicate writes, partial/empty/conflicting stage, stale snapshot, bounded deletion |
+| SQL replay and failure behavior | Real SQL Server 2022 service: same-run replay, duplicate writes, partial/empty/conflicting stage, stale snapshot, bounded deletion, competing publishers |
 
 The first hosted lint run failed because the local and hosted Ruff rules differed. Explicit repository rules, pinned tools and import/date fixes resolved it; the subsequent CI run passed. The initial baseline Databricks run failed on module imports; explicit bundle.sourcePath loading fixed the deployed execution context. These are actual debugging examples, not production incidents.
 
