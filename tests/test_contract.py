@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pytest
 
-
 ROOT = Path(__file__).resolve().parents[1]
 SAMPLE = ROOT / "sample_exports/run_date=2026-10-22/run_id=sample-001"
 

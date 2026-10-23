@@ -7,10 +7,11 @@ Secrets ``sis/jdbc_url``, ``sis/user`` and ``sis/password`` must exist.
 import argparse
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from pyspark.sql import SparkSession, functions as F
 from common import PROGRESS_COLUMNS, jdbc_options, table_name, validate_run_id
+from pyspark.sql import SparkSession
+from pyspark.sql import functions as F
 
 
 def main() -> None:
@@ -31,7 +32,7 @@ def main() -> None:
     spark.conf.set("spark.sql.session.timeZone", "UTC")
     options = jdbc_options(spark, args.secret_scope)
     source = table_name(args.catalog, args.schema, "gold_student_progress")
-    snapshot_at = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
+    snapshot_at = datetime.now(UTC).replace(tzinfo=None).isoformat()
     attempt_id = str(uuid.uuid4())
     snapshot = spark.read.table(source).select(*PROGRESS_COLUMNS).persist()
     try:

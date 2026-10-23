@@ -1,7 +1,6 @@
 import pytest
-
-from validate_environment import validate
 from common import table_name, validate_run_id
+from validate_environment import validate
 
 
 def settings():

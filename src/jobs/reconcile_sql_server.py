@@ -3,8 +3,8 @@
 import argparse
 import json
 
-from pyspark.sql import SparkSession
 from common import PROGRESS_COLUMNS, jdbc_options, validate_run_id
+from pyspark.sql import SparkSession
 
 
 def main():

@@ -82,8 +82,9 @@ def test_empty_and_missing_exports(spark):
 
 
 def test_conflicting_source_revisions(spark):
-    from transformations.parse import cdc_conflicts
     from pyspark.sql import functions as F
+
+    from transformations.parse import cdc_conflicts
     sample = Path(__file__).resolve().parents[1] / "sample_exports/run_date=2026-10-22/run_id=sample-001/part-00000.json"
     events = unwrap_extended_json(spark.read.schema(EVENT_SCHEMA).json(sample.as_uri().replace("%3D", "=")))
     assert cdc_conflicts(events.union(events)).count() == 0

@@ -4,7 +4,7 @@ import os
 import re
 import time
 import uuid
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -15,8 +15,8 @@ pytestmark = pytest.mark.skipif(os.getenv("RUN_SQLSERVER_TESTS") != "1", reason=
 @pytest.fixture
 def database():
     pymssql = pytest.importorskip("pymssql")
-    options = dict(server=os.environ["SQLSERVER_HOST"], user="sa",
-                   password=os.environ["SQLSERVER_PASSWORD"], login_timeout=5, autocommit=True)
+    options = {"server": os.environ["SQLSERVER_HOST"], "user": "sa",
+               "password": os.environ["SQLSERVER_PASSWORD"], "login_timeout": 5, "autocommit": True}
     for attempt in range(30):
         try:
             admin = pymssql.connect(**options)
@@ -51,7 +51,7 @@ def stage(db, run="r1", attempt="a1", student="s1", completions=1):
 def publish(db, run="r1", attempt="a1", count=1, when=None, deletes=False, fraction=0.05):
     cursor = db.cursor()
     cursor.execute("EXEC dbo.usp_publish_student_progress_v2 %s,%s,%s,%s,%s,%s",
-                   (run, attempt, count, when or datetime.utcnow(), int(deletes), fraction))
+                   (run, attempt, count, when or datetime.now(UTC).replace(tzinfo=None), int(deletes), fraction))
     while cursor.nextset():
         pass
 
@@ -92,7 +92,7 @@ def test_bad_staging_rolls_back(database, failure):
 
 def test_stale_snapshot_is_rejected(database):
     import pymssql
-    now = datetime.utcnow()
+    now = datetime.now(UTC).replace(tzinfo=None)
     stage(database)
     publish(database, when=now)
     stage(database, run="r2", attempt="a2", completions=99)
@@ -103,7 +103,7 @@ def test_stale_snapshot_is_rejected(database):
 
 def test_delete_requires_opt_in_and_threshold(database):
     import pymssql
-    now = datetime.utcnow()
+    now = datetime.now(UTC).replace(tzinfo=None)
     stage(database, student="s1")
     stage(database, student="s2")
     publish(database, count=2, when=now - timedelta(seconds=10))

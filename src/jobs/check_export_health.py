@@ -3,8 +3,9 @@
 import argparse
 import json
 
-from pyspark.sql import SparkSession, functions as F
 from common import table_name
+from pyspark.sql import SparkSession
+from pyspark.sql import functions as F
 
 
 def main() -> None:
