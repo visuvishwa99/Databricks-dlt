@@ -1,0 +1,108 @@
+name: Test and deploy Databricks pipeline
+
+on:
+  push:
+    paths: ["src/**", "tests/**", "scripts/**", "sql/**", "databricks.yml", "requirements*.txt", "pytest.ini", ".github/workflows/**"]
+  pull_request:
+    paths: ["src/**", "tests/**", "scripts/**", "sql/**", "databricks.yml", "requirements*.txt", "pytest.ini", ".github/workflows/**"]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Environment to deploy
+        type: choice
+        options: [dev, prod]
+        default: dev
+      run_job:
+        description: Run the full job after deployment (requires source and SQL Server)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - run: python -m pip install -r requirements-dev.txt
+      - run: ruff check .
+      - run: python -m pytest tests --ignore=tests/integration -q --junitxml=test-results/unit.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-test-results
+          path: test-results/
+
+  sql-integration:
+    runs-on: ubuntu-latest
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: Y
+          MSSQL_SA_PASSWORD: "CI-only-Disposable!4729"
+        ports: ["1433:1433"]
+    env:
+      RUN_SQLSERVER_TESTS: "1"
+      SQLSERVER_HOST: localhost
+      SQLSERVER_PASSWORD: "CI-only-Disposable!4729"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install pytest "pymssql>=2.3,<3"
+      - run: python -m pytest tests/integration -q --junitxml=test-results/sql.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sql-test-results
+          path: test-results/
+
+  deploy:
+    needs: [check, sql-integration]
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.ENABLE_AUTO_DEV == 'true') }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: lexia-deploy-${{ inputs.target || 'dev' }}
+      cancel-in-progress: false
+    environment: ${{ inputs.target == 'prod' && 'Prod' || 'Dev' }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      TARGET: ${{ inputs.target || 'dev' }}
+      DATABRICKS_AUTH_TYPE: github-oidc
+      DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
+      DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
+      BUNDLE_VAR_catalog: ${{ vars.CATALOG }}
+      BUNDLE_VAR_schema: ${{ vars.SCHEMA }}
+      BUNDLE_VAR_export_root: ${{ vars.EXPORT_ROOT }}
+      BUNDLE_VAR_school_table: ${{ vars.SCHOOL_TABLE }}
+      BUNDLE_VAR_writeback_cluster_id: ${{ vars.WRITEBACK_CLUSTER_ID }}
+      BUNDLE_VAR_alert_email: ${{ vars.ALERT_EMAIL }}
+      BUNDLE_VAR_run_as_service_principal: ${{ vars.RUN_AS_SERVICE_PRINCIPAL }}
+      BUNDLE_VAR_secret_scope: ${{ vars.SECRET_SCOPE || 'sis' }}
+      BUNDLE_VAR_use_managed_file_events: ${{ vars.USE_MANAGED_FILE_EVENTS || 'true' }}
+      BUNDLE_VAR_schedule_pause_status: PAUSED
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: databricks/setup-cli@v1.20.0
+      - run: python scripts/validate_environment.py --target "$TARGET" --live
+      - run: databricks bundle validate -t "$TARGET" --strict
+      - run: databricks bundle plan -t "$TARGET"
+      - run: databricks bundle deploy -t "$TARGET"
+      - run: databricks bundle summary -t "$TARGET" >> "$GITHUB_STEP_SUMMARY"
+      - if: ${{ inputs.run_job }}
+        run: databricks bundle run -t "$TARGET" student_events_refresh

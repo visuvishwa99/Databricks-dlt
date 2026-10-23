@@ -1,0 +1,188 @@
+bundle:
+  name: lexia_streaming
+  databricks_cli_version: ">= 1.11.0"
+
+variables:
+  catalog:
+    description: Unity Catalog destination catalog
+    default: edtech_dev
+  schema:
+    description: Destination schema
+    default: gold
+  export_root:
+    description: UC external location path to student_events exports
+    default: s3://lexia-docdb-exports/student_events/
+  school_table:
+    description: Federated SQL Server school dimension table
+    default: sis_sqlserver.dbo.school_enrollment
+  use_managed_file_events:
+    description: Enable file events for a configured S3 external location
+    default: "true"
+  writeback_cluster_id:
+    description: Existing dedicated job cluster with SQL Server JDBC driver and network access
+    default: REPLACE_WITH_CLUSTER_ID
+  secret_scope:
+    default: sis
+  max_files_per_trigger:
+    default: "1000"
+  freshness_minutes:
+    default: "60"
+  max_quarantine_fraction:
+    default: "0.01"
+  schedule_pause_status:
+    default: PAUSED
+  alert_email:
+    default: REPLACE_WITH_ALERT_EMAIL
+  run_as_service_principal:
+    default: REPLACE_WITH_SERVICE_PRINCIPAL_UUID
+
+resources:
+  pipelines:
+    student_events:
+      name: ${bundle.target}-lexia-student-events
+      catalog: ${var.catalog}
+      schema: ${var.schema}
+      serverless: true
+      continuous: false
+      channel: CURRENT
+      configuration:
+        export_root: ${var.export_root}
+        school_table: ${var.school_table}
+        use_managed_file_events: ${var.use_managed_file_events}
+        max_files_per_trigger: ${var.max_files_per_trigger}
+        spark.sql.session.timeZone: UTC
+        bundle.sourcePath: ${workspace.file_path}/src
+      libraries:
+        - file:
+            path: ./src/pipelines/bronze.py
+        - file:
+            path: ./src/pipelines/silver.py
+        - file:
+            path: ./src/pipelines/gold.py
+        - file:
+            path: ./src/pipelines/ops.py
+
+targets:
+  demo:
+    mode: development
+    variables:
+      catalog: workspace
+      schema: default
+      export_root: /Volumes/workspace/default/lexia_sample_exports/student_events/
+      school_table: __sample__
+      use_managed_file_events: "false"
+    resources:
+      volumes:
+        sample_exports:
+          catalog_name: workspace
+          schema_name: default
+          name: lexia_sample_exports
+          volume_type: MANAGED
+          comment: Synthetic student events for the Lexia portfolio demo
+      jobs:
+        student_events_refresh:
+          name: demo-lexia-student-events-refresh
+          max_concurrent_runs: 1
+          schedule:
+            quartz_cron_expression: "0 0/15 6-18 ? * MON-FRI"
+            timezone_id: America/Phoenix
+            pause_status: PAUSED
+          tasks:
+            - task_key: refresh_pipeline
+              pipeline_task:
+                pipeline_id: ${resources.pipelines.student_events.id}
+  dev:
+    default: true
+    mode: development
+    variables:
+      catalog: edtech_dev
+      schema: lexia_streaming
+    resources:
+      jobs:
+        student_events_refresh: &full_refresh_job
+          name: ${bundle.target}-lexia-student-events-refresh
+          max_concurrent_runs: 1
+          timeout_seconds: 3600
+          tags:
+            project: lexia_streaming
+            environment: ${bundle.target}
+          email_notifications:
+            on_failure:
+              - ${var.alert_email}
+          schedule:
+            quartz_cron_expression: "0 0/15 6-18 ? * MON-FRI"
+            timezone_id: America/Phoenix
+            pause_status: ${var.schedule_pause_status}
+          tasks:
+            - task_key: refresh_pipeline
+              timeout_seconds: 1800
+              max_retries: 1
+              min_retry_interval_millis: 60000
+              pipeline_task:
+                pipeline_id: ${resources.pipelines.student_events.id}
+            - task_key: check_export_health
+              timeout_seconds: 600
+              max_retries: 2
+              min_retry_interval_millis: 60000
+              depends_on:
+                - task_key: refresh_pipeline
+              existing_cluster_id: ${var.writeback_cluster_id}
+              spark_python_task:
+                python_file: ./src/jobs/check_export_health.py
+                parameters:
+                  - --catalog
+                  - ${var.catalog}
+                  - --schema
+                  - ${var.schema}
+                  - --freshness-minutes
+                  - ${var.freshness_minutes}
+                  - --max-quarantine-fraction
+                  - ${var.max_quarantine_fraction}
+            - task_key: write_back
+              timeout_seconds: 900
+              max_retries: 2
+              min_retry_interval_millis: 60000
+              depends_on:
+                - task_key: check_export_health
+              existing_cluster_id: ${var.writeback_cluster_id}
+              spark_python_task:
+                python_file: ./src/jobs/write_back_sql_server.py
+                parameters:
+                  - --catalog
+                  - ${var.catalog}
+                  - --schema
+                  - ${var.schema}
+                  - --run-id
+                  - "{{job.run_id}}"
+                  - --secret-scope
+                  - ${var.secret_scope}
+            - task_key: reconcile_sql_server
+              timeout_seconds: 600
+              max_retries: 1
+              min_retry_interval_millis: 60000
+              depends_on:
+                - task_key: write_back
+              existing_cluster_id: ${var.writeback_cluster_id}
+              spark_python_task:
+                python_file: ./src/jobs/reconcile_sql_server.py
+                parameters:
+                  - --catalog
+                  - ${var.catalog}
+                  - --schema
+                  - ${var.schema}
+                  - --run-id
+                  - "{{job.run_id}}"
+                  - --secret-scope
+                  - ${var.secret_scope}
+  prod:
+    mode: production
+    run_as:
+      service_principal_name: ${var.run_as_service_principal}
+    workspace:
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
+    variables:
+      catalog: edtech_prod
+      schema: lexia_streaming
+    resources:
+      jobs:
+        student_events_refresh: *full_refresh_job
