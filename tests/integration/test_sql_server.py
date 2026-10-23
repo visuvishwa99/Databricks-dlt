@@ -4,6 +4,7 @@ import os
 import re
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -115,3 +116,31 @@ def test_delete_requires_opt_in_and_threshold(database):
     assert scalar(database, "SELECT COUNT(*) FROM dbo.student_progress") == 2
     publish(database, run="r2", attempt="a2", when=now, deletes=True, fraction=0.5)
     assert scalar(database, "SELECT COUNT(*) FROM dbo.student_progress") == 1
+
+
+def test_newer_snapshot_wins_concurrent_publishers(database):
+    import pymssql
+    now = datetime.now(UTC).replace(tzinfo=None)
+    stage(database, run="older", attempt="old", completions=1)
+    stage(database, run="newer", attempt="new", completions=2)
+    name = scalar(database, "SELECT DB_NAME()")
+
+    def apply(run, attempt, timestamp):
+        connection = pymssql.connect(server=os.environ["SQLSERVER_HOST"], user="sa",
+                                     password=os.environ["SQLSERVER_PASSWORD"], database=name,
+                                     autocommit=True)
+        try:
+            publish(connection, run=run, attempt=attempt, when=timestamp)
+        except pymssql.DatabaseError as error:
+            # Only the old writer may lose the race to a committed newer snapshot.
+            if run != "older" or "newer snapshot" not in str(error):
+                raise
+        finally:
+            connection.close()
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        futures = [pool.submit(apply, "older", "old", now - timedelta(seconds=10)),
+                   pool.submit(apply, "newer", "new", now)]
+        for future in futures:
+            future.result()
+    assert scalar(database, "SELECT total_completions FROM dbo.student_progress") == 2

@@ -48,6 +48,9 @@ def main():
         cluster = cli("clusters", "get", os.environ["BUNDLE_VAR_writeback_cluster_id"])
         if cluster.get("data_security_mode") != "SINGLE_USER":
             raise ValueError("JDBC publisher requires a dedicated SINGLE_USER cluster")
+        version = re.match(r"(\d+)\.(\d+)", cluster.get("spark_version", ""))
+        if not version or tuple(map(int, version.groups())) < (15, 4):
+            raise ValueError("JDBC publisher requires DBR 15.4 or later with Python 3.11+")
     print(f"Environment preflight passed: {args.target}")
 
 

@@ -1,0 +1,14 @@
+{
+  "checked_at": "2026-10-23T06:09:21.776341+00:00",
+  "namespace": "workspace.default",
+  "statement_id": "01f1cea8-3a82-19f8-84b9-18faa29e052b",
+  "metrics": {
+    "bronze_rows": 2,
+    "current_rows": 2,
+    "daily_rows": 2,
+    "quarantine_rows": 0,
+    "failed_exports": 0,
+    "conflicting_revisions": 0
+  },
+  "result": "PASS"
+}
