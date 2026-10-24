@@ -11,6 +11,7 @@ sync:
     - sql/**
     - .github/**
     - README.md
+    - CHANGELOG.md
     - requirements-dev.txt
     - pytest.ini
     - ruff.toml
@@ -39,6 +40,9 @@ variables:
   maintenance_secret_scope:
     description: Scope with TLS JDBC URL and maintenance-only SQL credentials
     default: sis_maintenance
+  staging_retention_days:
+    description: Minimum age for removing unaudited staging rows (7 to 365)
+    default: "7"
   max_files_per_trigger:
     default: "1000"
   freshness_minutes:
@@ -46,6 +50,8 @@ variables:
   max_quarantine_fraction:
     default: "0.01"
   schedule_pause_status:
+    default: PAUSED
+  cleanup_pause_status:
     default: PAUSED
   alert_email:
     default: REPLACE_WITH_ALERT_EMAIL
@@ -200,7 +206,7 @@ targets:
           schedule:
             quartz_cron_expression: "0 0 2 * * ?"
             timezone_id: UTC
-            pause_status: ${var.schedule_pause_status}
+            pause_status: ${var.cleanup_pause_status}
           tasks:
             - task_key: cleanup_old_orphans
               timeout_seconds: 300
@@ -212,7 +218,7 @@ targets:
                   - --secret-scope
                   - ${var.maintenance_secret_scope}
                   - --retention-days
-                  - "7"
+                  - ${var.staging_retention_days}
   prod:
     mode: production
     run_as:

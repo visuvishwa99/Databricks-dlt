@@ -27,6 +27,12 @@ def validate(env, target):
         raise ValueError("Full environments require an S3 export prefix")
     if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", env["BUNDLE_VAR_alert_email"]):
         raise ValueError("Configure a real operations alert email")
+    try:
+        retention_days = int(env.get("BUNDLE_VAR_staging_retention_days", "7"))
+    except ValueError as error:
+        raise ValueError("Staging retention must be between 7 and 365 days") from error
+    if not 7 <= retention_days <= 365:
+        raise ValueError("Staging retention must be between 7 and 365 days")
     if target == "prod" and env.get("GITHUB_REF", "refs/heads/main") != "refs/heads/main":
         raise ValueError("Production deployment must use main")
     if target == "prod" and env["BUNDLE_VAR_catalog"] == "workspace":

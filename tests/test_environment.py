@@ -24,6 +24,13 @@ def test_dev_configuration():
     validate(settings(), "dev")
 
 
+def test_cleanup_retention_is_bounded():
+    env = settings()
+    env["BUNDLE_VAR_staging_retention_days"] = "1"
+    with pytest.raises(ValueError, match="retention"):
+        validate(env, "dev")
+
+
 def test_production_requires_runtime_identity_and_main():
     env = settings()
     with pytest.raises(ValueError, match="run_as"):

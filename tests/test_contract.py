@@ -44,7 +44,7 @@ def test_bundle_contains_required_resources():
     demo_tasks = bundle["targets"]["demo"]["resources"]["jobs"]["student_events_refresh"]["tasks"]
     assert [task["task_key"] for task in demo_tasks] == ["refresh_pipeline"]
     cleanup = bundle["targets"]["dev"]["resources"]["jobs"]["staging_cleanup"]
-    assert cleanup["schedule"]["pause_status"] == "${var.schedule_pause_status}"
+    assert cleanup["schedule"]["pause_status"] == "${var.cleanup_pause_status}"
     assert cleanup["tasks"][0]["task_key"] == "cleanup_old_orphans"
     assert "workspace" not in bundle or "host" not in bundle["workspace"]
     assert "${workspace.current_user.userName}" in bundle["targets"]["prod"]["workspace"]["root_path"]

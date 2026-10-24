@@ -90,6 +90,8 @@ jobs:
       BUNDLE_VAR_run_as_service_principal: ${{ vars.RUN_AS_SERVICE_PRINCIPAL }}
       BUNDLE_VAR_secret_scope: ${{ vars.SECRET_SCOPE || 'sis' }}
       BUNDLE_VAR_maintenance_secret_scope: ${{ vars.MAINTENANCE_SECRET_SCOPE || 'sis_maintenance' }}
+      BUNDLE_VAR_staging_retention_days: ${{ vars.STAGING_RETENTION_DAYS || '7' }}
+      BUNDLE_VAR_cleanup_pause_status: PAUSED
       BUNDLE_VAR_use_managed_file_events: ${{ vars.USE_MANAGED_FILE_EVENTS || 'true' }}
       BUNDLE_VAR_schedule_pause_status: PAUSED
     steps:
