@@ -237,8 +237,8 @@ transaction advisory lock and stale snapshots fail.
 The [recorded end-to-end run](docs/postgres-e2e-evidence.json) passed on October 23,
 2026 (America/Phoenix): pipeline run `1006797370445061`, **2 published rows**, full-field
 reconciliation and replay passed, **0 failed exports**, **0 CDC conflicts**, and
-**2 reviewed quarantine rows and 0 unreviewed rows**. Evidence timestamps use UTC. The PostgreSQL
-transaction suite also passed locally; details are in [evidence](docs/evidence.md).
+**2 reviewed quarantine rows and 0 unreviewed rows**. Evidence timestamps use UTC. CI passed **31 unit tests and 17 PostgreSQL integration tests**, with zero skips.
+Details are in [evidence](docs/evidence.md).
 
 ### Retention and access
 

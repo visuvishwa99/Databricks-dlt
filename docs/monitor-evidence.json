@@ -1,0 +1,17 @@
+{
+  "checked_at": "2026-10-24T06:47:26.667766+00:00",
+  "run_id": 580506589917581,
+  "result": "SUCCESS",
+  "email_notifications": {
+    "on_failure": [
+      "visuvishwa619@gmail.com"
+    ]
+  },
+  "schedule": {
+    "pause_status": "PAUSED",
+    "quartz_cron_expression": "0 0/15 6-18 ? * MON-FRI",
+    "timezone_id": "America/Phoenix"
+  },
+  "email_receipt_verified": false,
+  "limitations": "Healthy path verified. Missing/stale cases are unit-tested; alert receipt and scheduled operation are not verified."
+}

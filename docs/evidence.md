@@ -14,10 +14,19 @@ local PostgreSQL publication. See [machine-readable evidence](postgres-e2e-evide
   demo omits the freshness SLA; it is not a production load test.
 
 - API migration: all four pipeline files now use `pyspark.pipelines`; deployed and run successfully.
+- Latest CI at f197c88: **31 unit tests and 17 PostgreSQL integration tests passed**, zero skips/failures. JUnit artifacts verified from run 40071467089.
 - Baseline user verification at ce91443: 25 unit tests and 17 PostgreSQL tests.
 - Current local fast suite: 19 passed, Spark module skipped (12 Spark tests run in CI).
 - New tests cover quarantine review drift/source binding and missing/stale-run detection.
 - Historical test counts below apply only to their named earlier revisions.
+
+## Monitoring evidence
+
+Independent cloud monitor run `580506589917581` succeeded against the heartbeat
+written after PostgreSQL reconciliation. Failure email is configured for
+`visuvishwa619@gmail.com`; its schedule is PAUSED. See [monitor evidence](monitor-evidence.json).
+No email-delivery claim is made from a healthy run. Missing/stale conditions are
+unit-tested, and the local HTML snapshot dashboard returned OK.
 
 ## Scale evidence
 
