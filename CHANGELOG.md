@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add PostgreSQL transactional publication, reconciliation, bounded staging retention, restricted roles, secret provisioning and outbound local end-to-end runner.
+- Verify Databricks-to-local-PostgreSQL demo and add PostgreSQL integration CI.
+- Document PowerShell/Git Bash secret setup and current deployment boundaries.
+
 - Compare SQL serving text by bytes and length so case-only changes, trailing spaces, and NULL transitions publish correctly on case-insensitive databases.
 - Preserve malformed event JSON in bronze and route it to quarantine with an explicit reason.
 - Avoid SQL Server writes for unchanged serving rows and add a bounded cleanup procedure for old, unaudited staging attempts.

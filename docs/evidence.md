@@ -1,3 +1,20 @@
+# Latest PostgreSQL verification
+
+On October 23, 2026 (America/Phoenix), the synthetic pipeline completed through
+local PostgreSQL publication. See [machine-readable evidence](postgres-e2e-evidence.json).
+
+- Databricks job run: `981715506262947`, SUCCESS.
+- Local PostgreSQL `dbx_db`: 2 serving rows, exact reconciliation passed.
+- Same-run replay: passed with 2 rows and one durable audit entry.
+- Source: 0 failed exports, 0 conflicting revisions, 2 expected quarantined rows.
+- PostgreSQL integration suite: 17 passed, covering transaction guards,
+  exact changes, retention, reconciliation, concurrent replay and temp-table protection.
+- The transport is an outbound local Python runner using the SQL Statements API.
+  Direct Databricks JDBC connectivity to Windows is not verified. The fixed-sample
+  demo omits the freshness SLA; it is not a production load test.
+
+The records below are historical and describe earlier SQL Server work.
+
 # Verification evidence and production release gates
 
 Evidence updated: October 23, 2026 America/Phoenix (October 24 UTC). Results apply to the synthetic demo and disposable CI database, not a production customer workload.

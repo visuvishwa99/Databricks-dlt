@@ -1,3 +1,10 @@
+> **PostgreSQL update:** dev/prod publishing now uses PostgreSQL and defaults to
+> `sis_postgres` / `sis_postgres_maintenance`. Follow the root README's PostgreSQL
+> section for provisioning, keys, local end-to-end execution and TLS prerequisites.
+> SQL Server-specific instructions below describe the legacy implementation and
+> must not be applied to the PostgreSQL database. School Federation remains a
+> separately configured source; the demonstrated pipeline uses synthetic schools.
+
 # Deployment and CI/CD
 
 ## Repository layout
