@@ -27,7 +27,7 @@ def database():
                 raise
             time.sleep(2)
     name = "lexia_ci_" + uuid.uuid4().hex
-    admin.cursor().execute(f"CREATE DATABASE [{name}]")
+    admin.cursor().execute(f"CREATE DATABASE [{name}] COLLATE Latin1_General_100_CI_AS")
     connection = pymssql.connect(database=name, **options)
     try:
         script = (Path(__file__).resolve().parents[2] / "sql/sql_server_setup.sql").read_text(encoding="utf-8-sig")
@@ -79,6 +79,34 @@ def test_new_run_with_identical_snapshot_preserves_updated_at(database):
     stage(database, run="r2", attempt="a2")
     publish(database, run="r2", attempt="a2", when=now)
     assert scalar(database, "SELECT updated_at FROM dbo.student_progress") == before
+    assert scalar(database, "SELECT COUNT(*) FROM dbo.student_progress_write_audit_v2") == 2
+
+
+@pytest.mark.parametrize("column", ["school_id", "latest_unit_id", "latest_level_id"])
+@pytest.mark.parametrize("before,after", [
+    ("Value-A", "value-a"),
+    ("value", "value "),
+    ("value ", "value"),
+    (None, "value"),
+    ("value", None),
+    ("value", "value"),
+])
+def test_publication_preserves_exact_string_corrections(database, column, before, after):
+    now = datetime.now(UTC).replace(tzinfo=None)
+    stage(database)
+    database.cursor().execute(f"UPDATE stg.student_progress_v2 SET {column}=%s", (before,))
+    publish(database, when=now - timedelta(seconds=2))
+    # A fixed old timestamp makes the change/no-change assertion independent of clock resolution.
+    database.cursor().execute("UPDATE dbo.student_progress SET updated_at='2000-01-01'")
+    original_timestamp = scalar(database, "SELECT updated_at FROM dbo.student_progress")
+    stage(database, run="r2", attempt="a2")
+    database.cursor().execute(
+        f"UPDATE stg.student_progress_v2 SET {column}=%s WHERE run_id='r2'", (after,)
+    )
+    publish(database, run="r2", attempt="a2", when=now)
+    assert scalar(database, f"SELECT {column} FROM dbo.student_progress") == after
+    changed = scalar(database, "SELECT updated_at FROM dbo.student_progress") != original_timestamp
+    assert changed == (before != after)
     assert scalar(database, "SELECT COUNT(*) FROM dbo.student_progress_write_audit_v2") == 2
 
 

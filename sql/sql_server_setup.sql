@@ -106,10 +106,16 @@ BEGIN
         FROM dbo.student_progress t JOIN #candidate s
             ON s.product_name=t.product_name AND s.student_id=t.student_id
         WHERE EXISTS (
-            SELECT s.school_id, s.latest_unit_id, s.latest_level_id,
+            -- Compare UTF-16 bytes and lengths so collation and SQL string padding
+            -- cannot hide a correction that Spark reconciliation would detect.
+            SELECT CONVERT(varbinary(200), s.school_id), DATALENGTH(s.school_id),
+                CONVERT(varbinary(200), s.latest_unit_id), DATALENGTH(s.latest_unit_id),
+                CONVERT(varbinary(200), s.latest_level_id), DATALENGTH(s.latest_level_id),
                 s.last_completed_at, s.total_completions
             EXCEPT
-            SELECT t.school_id, t.latest_unit_id, t.latest_level_id,
+            SELECT CONVERT(varbinary(200), t.school_id), DATALENGTH(t.school_id),
+                CONVERT(varbinary(200), t.latest_unit_id), DATALENGTH(t.latest_unit_id),
+                CONVERT(varbinary(200), t.latest_level_id), DATALENGTH(t.latest_level_id),
                 t.last_completed_at, t.total_completions
         );
         INSERT dbo.student_progress (
