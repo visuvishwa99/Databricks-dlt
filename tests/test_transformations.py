@@ -9,7 +9,8 @@ pyspark = pytest.importorskip("pyspark")
 from pyspark.sql import SparkSession  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from transformations.parse import reconcile_exports, unwrap_extended_json  # noqa: E402
+from transformations.parse import quarantine_reasons, reconcile_exports, unwrap_extended_json  # noqa: E402
+from transformations.rules import DROP_RULES  # noqa: E402
 from transformations.schema import EVENT_SCHEMA  # noqa: E402
 
 
@@ -106,3 +107,22 @@ def test_local_school_day_and_latest_progress(spark):
     assert {str(row.school_day) for row in days} == {"2026-03-07", "2026-03-08"}
     progress = student_progress(events).first()
     assert progress.total_completions == 2 and progress.latest_unit_id == "u2"
+
+
+def test_malformed_json_and_null_change_type_are_quarantined(spark, tmp_path):
+    sample = Path(__file__).resolve().parents[1] / "sample_exports/run_date=2026-10-22/run_id=sample-001/part-00000.json"
+    import json
+
+    event = json.loads(sample.read_text(encoding="utf-8").splitlines()[0])
+    event["change_type"] = None
+    path = tmp_path / "part-00000.json"
+    path.write_text(json.dumps(event) + "\n{" + "\n", encoding="utf-8")
+    parsed = unwrap_extended_json(
+        spark.read.option("mode", "PERMISSIVE")
+        .option("columnNameOfCorruptRecord", "_corrupt_record")
+        .schema(EVENT_SCHEMA).json(str(path))
+    )
+    rows = quarantine_reasons(parsed, DROP_RULES).select("quality_errors", "_corrupt_record").collect()
+    assert len(rows) == 2
+    assert any("valid_change_type" in row.quality_errors and row._corrupt_record is None for row in rows)
+    assert any("no_corrupt_record" in row.quality_errors and row._corrupt_record for row in rows)

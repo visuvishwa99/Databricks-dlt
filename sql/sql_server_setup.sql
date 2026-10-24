@@ -19,6 +19,9 @@ GO
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID('stg.student_progress_v2') AND name='IX_progress_attempt')
 CREATE INDEX IX_progress_attempt ON stg.student_progress_v2(run_id, attempt_id);
 GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID('stg.student_progress_v2') AND name='IX_progress_staged_at')
+CREATE INDEX IX_progress_staged_at ON stg.student_progress_v2(staged_at) INCLUDE (run_id, attempt_id);
+GO
 IF OBJECT_ID('dbo.student_progress', 'U') IS NULL
 CREATE TABLE dbo.student_progress (
     product_name nvarchar(100) NOT NULL,
@@ -101,7 +104,14 @@ BEGIN
             latest_level_id=s.latest_level_id, last_completed_at=s.last_completed_at,
             total_completions=s.total_completions, updated_at=SYSUTCDATETIME()
         FROM dbo.student_progress t JOIN #candidate s
-            ON s.product_name=t.product_name AND s.student_id=t.student_id;
+            ON s.product_name=t.product_name AND s.student_id=t.student_id
+        WHERE EXISTS (
+            SELECT s.school_id, s.latest_unit_id, s.latest_level_id,
+                s.last_completed_at, s.total_completions
+            EXCEPT
+            SELECT t.school_id, t.latest_unit_id, t.latest_level_id,
+                t.last_completed_at, t.total_completions
+        );
         INSERT dbo.student_progress (
             product_name, student_id, school_id, latest_unit_id,
             latest_level_id, last_completed_at, total_completions, updated_at
@@ -126,6 +136,39 @@ BEGIN
     END CATCH;
 END;
 GO
--- Runtime role: INSERT/SELECT on staging, SELECT on serving/audit, EXECUTE on procedure.
--- No direct UPDATE/DELETE/ALTER on serving. Use a separate migration and cleanup identity.
--- Keep successful staging attempts until downstream reconciliation and retention gates pass.
+CREATE OR ALTER PROCEDURE dbo.usp_cleanup_student_progress_staging_v2
+    @retention_days int = 7
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+    IF @retention_days IS NULL OR @retention_days < 7 OR @retention_days > 365
+        THROW 51020, 'Staging retention must be between 7 and 365 days', 1;
+
+    -- Serialize against publication and preserve every audited attempt for recovery.
+    BEGIN TRY
+        BEGIN TRANSACTION;
+        DECLARE @lock_result int;
+        EXEC @lock_result = sys.sp_getapplock
+            @Resource='lexia_student_progress_publish', @LockMode='Exclusive',
+            @LockOwner='Transaction', @LockTimeout=30000;
+        IF @lock_result < 0 THROW 51021, 'Cleanup lock unavailable', 1;
+        DELETE s FROM stg.student_progress_v2 s
+        WHERE s.staged_at < DATEADD(day, -@retention_days, SYSUTCDATETIME())
+          AND NOT EXISTS (
+              SELECT 1 FROM dbo.student_progress_write_audit_v2 a
+              WHERE a.run_id=s.run_id AND a.attempt_id=s.attempt_id
+          );
+        DECLARE @deleted_rows bigint = @@ROWCOUNT;
+        COMMIT TRANSACTION;
+        SELECT @deleted_rows AS deleted_rows;
+    END TRY
+    BEGIN CATCH
+        IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH;
+END;
+GO
+-- Runtime role: INSERT/SELECT on staging, SELECT on serving/audit, EXECUTE on publish procedure.
+-- Maintenance role: EXECUTE on cleanup procedure only; no direct DELETE privilege is needed.
+-- Audited attempts remain in staging until a separately reviewed archive/retention policy is implemented.

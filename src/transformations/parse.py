@@ -82,7 +82,10 @@ def cdc_conflicts(events: DataFrame) -> DataFrame:
     """The producer must supply one business payload per document/update time."""
     from transformations.schema import EVENT_SCHEMA
 
-    business_columns = [field.name for field in EVENT_SCHEMA if not field.name.startswith("_rescued")]
+    business_columns = [
+        field.name for field in EVENT_SCHEMA
+        if field.name not in {"_rescued_data", "_corrupt_record"}
+    ]
     payload = F.to_json(F.struct(*[F.col(name) for name in business_columns]))
     return events.groupBy("_id", "updated_at").agg(
         F.countDistinct(F.sha2(payload, 256)).alias("payload_versions")

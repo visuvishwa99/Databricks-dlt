@@ -31,6 +31,7 @@ EVENT_SCHEMA = StructType(
         StructField("attempt_timestamp", DATE),
         StructField("updated_at", DATE),
         StructField("_rescued_data", StringType()),
+        StructField("_corrupt_record", StringType()),
     ]
 )
 

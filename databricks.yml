@@ -36,6 +36,9 @@ variables:
     default: REPLACE_WITH_CLUSTER_ID
   secret_scope:
     default: sis
+  maintenance_secret_scope:
+    description: Scope with TLS JDBC URL and maintenance-only SQL credentials
+    default: sis_maintenance
   max_files_per_trigger:
     default: "1000"
   freshness_minutes:
@@ -187,6 +190,29 @@ targets:
                   - "{{job.run_id}}"
                   - --secret-scope
                   - ${var.secret_scope}
+        staging_cleanup: &staging_cleanup_job
+          name: ${bundle.target}-lexia-staging-cleanup
+          max_concurrent_runs: 1
+          timeout_seconds: 600
+          email_notifications:
+            on_failure:
+              - ${var.alert_email}
+          schedule:
+            quartz_cron_expression: "0 0 2 * * ?"
+            timezone_id: UTC
+            pause_status: ${var.schedule_pause_status}
+          tasks:
+            - task_key: cleanup_old_orphans
+              timeout_seconds: 300
+              max_retries: 1
+              existing_cluster_id: ${var.writeback_cluster_id}
+              spark_python_task:
+                python_file: ./src/jobs/cleanup_staging.py
+                parameters:
+                  - --secret-scope
+                  - ${var.maintenance_secret_scope}
+                  - --retention-days
+                  - "7"
   prod:
     mode: production
     run_as:
@@ -199,3 +225,4 @@ targets:
     resources:
       jobs:
         student_events_refresh: *full_refresh_job
+        staging_cleanup: *staging_cleanup_job

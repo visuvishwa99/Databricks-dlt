@@ -71,6 +71,32 @@ def test_commit_and_replay_are_idempotent(database):
     assert scalar(database, "SELECT COUNT(*) FROM dbo.student_progress_write_audit_v2") == 1
 
 
+def test_new_run_with_identical_snapshot_preserves_updated_at(database):
+    now = datetime.now(UTC).replace(tzinfo=None)
+    stage(database)
+    publish(database, when=now - timedelta(seconds=2))
+    before = scalar(database, "SELECT updated_at FROM dbo.student_progress")
+    stage(database, run="r2", attempt="a2")
+    publish(database, run="r2", attempt="a2", when=now)
+    assert scalar(database, "SELECT updated_at FROM dbo.student_progress") == before
+    assert scalar(database, "SELECT COUNT(*) FROM dbo.student_progress_write_audit_v2") == 2
+
+
+def test_cleanup_removes_only_old_unaudited_attempts(database):
+    stage(database, run="audited", attempt="keep")
+    publish(database, run="audited", attempt="keep")
+    stage(database, run="orphan", attempt="remove")
+    stage(database, run="recent", attempt="keep")
+    database.cursor().execute(
+        "UPDATE stg.student_progress_v2 SET staged_at=DATEADD(day,-8,SYSUTCDATETIME()) "
+        "WHERE run_id IN ('audited','orphan')"
+    )
+    database.cursor().execute("EXEC dbo.usp_cleanup_student_progress_staging_v2 @retention_days=7")
+    assert scalar(database, "SELECT COUNT(*) FROM stg.student_progress_v2 WHERE run_id='orphan'") == 0
+    assert scalar(database, "SELECT COUNT(*) FROM stg.student_progress_v2 WHERE run_id='audited'") == 1
+    assert scalar(database, "SELECT COUNT(*) FROM stg.student_progress_v2 WHERE run_id='recent'") == 1
+
+
 def test_identical_executor_retries_are_deduplicated(database):
     stage(database)
     stage(database)

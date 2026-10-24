@@ -2,6 +2,8 @@
 
 Evidence date: October 22, 2026 America/Phoenix (October 23 UTC). Results apply to the synthetic demo and disposable CI database, not a production customer workload.
 
+The Unreleased changes in CHANGELOG.md require a new hosted CI run and workspace demo before their behavior can be added to the verified table below. In particular, malformed-record quarantine, unchanged-row SQL timestamps, and staging cleanup are implemented but are not recorded here as completed workspace or hosted results yet.
+
 ## Verified
 
 | Area | Evidence |

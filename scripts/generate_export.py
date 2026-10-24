@@ -6,9 +6,10 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 
-def generate(root, run_id, rows, rows_per_file, event_time, revision=0, quarantine_every=0):
-    if rows < 0 or rows_per_file <= 0 or revision < 0 or quarantine_every < 0:
-        raise ValueError("Counts and revision must be nonnegative; rows_per_file must be positive")
+def generate(root, run_id, rows, rows_per_file, event_time, revision=0, quarantine_every=0,
+             student_cardinality=10000):
+    if rows < 0 or rows_per_file <= 0 or revision < 0 or quarantine_every < 0 or student_cardinality <= 0:
+        raise ValueError("Counts and revision must be nonnegative; file size and cardinality must be positive")
     if not run_id or any(c not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-" for c in run_id):
         raise ValueError("run_id must contain only letters, digits, hyphen or underscore")
     now = datetime.now(UTC)
@@ -24,7 +25,7 @@ def generate(root, run_id, rows, rows_per_file, event_time, revision=0, quaranti
                 record = {
                     "_id": {"$oid": f"{i:024x}"}, "schema_version": 1,
                     "product_name": "alpha", "change_type": "UnitCompleted",
-                    "student_id": None if quarantine_every and i % quarantine_every == 0 else f"synthetic-{i % 10000}",
+                    "student_id": None if quarantine_every and i % quarantine_every == 0 else f"synthetic-{i % student_cardinality}",
                     "school_id": "demo-school-1", "grade_level": "03", "unit_id": f"unit-{revision}",
                     "level_id": "level-1", "is_completed": True,
                     "attempt_timestamp": {"$date": event_time.isoformat()},
@@ -49,9 +50,11 @@ def main():
     parser.add_argument("--event-time", default=(datetime.now(UTC) - timedelta(hours=1)).isoformat())
     parser.add_argument("--revision", type=int, default=0)
     parser.add_argument("--quarantine-every", type=int, default=0)
+    parser.add_argument("--student-cardinality", type=int, default=10000)
     args = parser.parse_args()
     print(generate(args.output, args.run_id, args.rows, args.rows_per_file,
-                   datetime.fromisoformat(args.event_time), args.revision, args.quarantine_every))
+                   datetime.fromisoformat(args.event_time), args.revision, args.quarantine_every,
+                   args.student_cardinality))
 
 
 if __name__ == "__main__":

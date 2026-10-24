@@ -26,6 +26,7 @@ run_id is globally unique within a source prefix, not a retry counter. Never ove
 | change_type | ActivityStarted, ActivityIn_Progress, ActivityCompleted, LevelCompleted, UnitCompleted, StrandCompleted |
 | unit_id, level_id, strand_id, activity_id, session_id | Nullable source attributes |
 | unexpected fields/types | Rescue and quarantine; not silently accepted |
+| malformed event JSON | Preserve the raw line in `_corrupt_record` and quarantine; a malformed manifest fails ingestion |
 
 One (_id, updated_at) must identify one business payload. Timestamp precision must distinguish all meaningful updates. A source monotonic revision is required before adopting a producer that can emit multiple changes at the same timestamp. The current implementation detects conflicts rather than selecting an arbitrary winner. Partial update documents are unsupported: each exported record must be a complete current document image.
 

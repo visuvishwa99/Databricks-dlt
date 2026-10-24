@@ -26,7 +26,7 @@ def test_rules_are_shared_with_quarantine():
     try:
         from transformations.rules import DROP_ALL, DROP_RULES, FAIL_RULES
 
-        assert {"valid_update_time", "valid_product", "no_rescued_fields"} <= DROP_RULES.keys()
+        assert {"valid_update_time", "valid_product", "no_rescued_fields", "no_corrupt_record"} <= DROP_RULES.keys()
         assert all(f"({rule})" in DROP_ALL for rule in DROP_RULES.values())
         assert "schema_version = 1" in FAIL_RULES.values()
     finally:
@@ -43,5 +43,8 @@ def test_bundle_contains_required_resources():
     }
     demo_tasks = bundle["targets"]["demo"]["resources"]["jobs"]["student_events_refresh"]["tasks"]
     assert [task["task_key"] for task in demo_tasks] == ["refresh_pipeline"]
+    cleanup = bundle["targets"]["dev"]["resources"]["jobs"]["staging_cleanup"]
+    assert cleanup["schedule"]["pause_status"] == "${var.schedule_pause_status}"
+    assert cleanup["tasks"][0]["task_key"] == "cleanup_old_orphans"
     assert "workspace" not in bundle or "host" not in bundle["workspace"]
     assert "${workspace.current_user.userName}" in bundle["targets"]["prod"]["workspace"]["root_path"]

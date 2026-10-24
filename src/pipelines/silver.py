@@ -20,7 +20,9 @@ def parsed():
 @dlt.expect_all_or_drop(DROP_RULES)
 @dlt.expect_all(WARN_RULES)
 def silver_student_events_clean():
-    return parsed()
+    # Unparseable JSON has no reliable document ID and belongs in quarantine.
+    # Keep the fail expectation for parseable records with a missing ID.
+    return parsed().where("_corrupt_record IS NULL")
 
 
 @dlt.table(name="silver_quarantine_events")

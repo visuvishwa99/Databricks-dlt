@@ -20,7 +20,7 @@ databricks bundle plan -t demo -p DEV
 databricks bundle deploy -t demo -p DEV
 ```
 
-On Unix activate with source .venv/bin/activate. Unset a system SPARK_HOME if it points to a different Spark installation. SQL integration tests run automatically in GitHub Actions against a disposable SQL Server 2022 service, using a separate temporary test database for each test. The visible CI database password is only for that ephemeral service; it is not an application credential.
+On Unix activate with source .venv/bin/activate. Unset a system SPARK_HOME if it points to a different Spark installation. SQL integration tests run automatically in GitHub Actions against a disposable SQL Server 2022 service, using a separate temporary test database for each test. The visible CI database password is only for that ephemeral service; it is not an application credential. CI also runs on documentation-only pull requests so required checks can complete.
 
 ## Existing demo
 
@@ -51,6 +51,7 @@ Create Dev and Prod GitHub environments. The same Git commit deploys to differen
 | Variable | ALERT_EMAIL | Real operations recipient; verify delivery before release |
 | Variable | RUN_AS_SERVICE_PRINCIPAL | Production runtime application UUID; required for prod |
 | Variable | SECRET_SCOPE | Optional, defaults to sis; contains jdbc_url, user, password |
+| Variable | MAINTENANCE_SECRET_SCOPE | Optional, defaults to sis_maintenance; separate SQL identity with EXECUTE on the cleanup procedure |
 | Variable | USE_MANAGED_FILE_EVENTS | Optional true/false, defaults true |
 | Repository variable | ENABLE_AUTO_DEV | Set true only after Dev is fully configured; enables deployment on main pushes |
 
@@ -58,7 +59,7 @@ Configure the deployment principal's federation policy in the Databricks account
 
 CI runs lint, Spark tests and SQL transaction tests on relevant pushes and pull requests. Deployment requires both jobs to pass. Manual workflow_dispatch chooses dev or prod; production must use main. Automatic dev is opt-in with ENABLE_AUTO_DEV=true. Branch/environment protection must require the check and sql-integration checks and restrict who can modify workflows. GitHub Actions are pinned by commit SHA and Python test tools by version; review dependency upgrades deliberately. The SQL Server container tracks 2022-latest to receive updates and must be revalidated when its image changes.
 
-The deploy job checks environment settings and selected live resources, validates/plans/deploys the bundle, and records links in the run summary. run_job defaults false; when enabled it runs the full integration job after deployment. Schedules remain paused until an explicit operations decision. Deploying infrastructure successfully is not the same as validating data execution.
+The deploy job checks environment settings and selected live resources, validates/plans/deploys the bundle, and records links in the run summary. run_job defaults false; when enabled it runs the full integration job after deployment. A separate daily staging-cleanup job uses the maintenance secret scope and stays paused until SQL grants, retention, and alert delivery are verified. Its stored procedure only removes unaudited attempts older than seven days. Schedules remain paused until an explicit operations decision. Deploying infrastructure successfully is not the same as validating data execution.
 
 ## Promotion and rollback
 

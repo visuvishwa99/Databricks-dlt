@@ -35,7 +35,7 @@ Then name the actual evidence in evidence.md and explicitly identify the externa
 | What if updated_at is absent? | V1 falls back to attempt time for immutable records. It is insufficient for mutable sources; require authoritative revision data before onboarding them. |
 | Why not dropDuplicates(_id)? | It can keep the wrong revision and ignores correction order. Stateful streaming dedup also introduces retention/watermark decisions. |
 | Where is the watermark? | There is no event-time windowed dedup aggregation here. Do not invent a watermark for AUTO CDC. Understand each operator's managed state and source history retention separately. |
-| What happens to malformed input? | Syntactically broken JSON fails file ingestion. Parsed but invalid fields are quarantined; missing identity/unknown schema version fails the clean flow. Explain why contract errors can stop publication. |
+| What happens to malformed input? | Broken event JSON is captured in `_corrupt_record` and quarantined; schema drift enters `_rescued_data`. Bad manifests and parseable records with missing identity/unknown version still fail the clean flow. The quarantine threshold can block publication. |
 | Can rescued data enter gold? | No: _rescued_data must be null for clean rows. Unknown fields trigger review rather than silent schema acceptance. |
 | Why require a manifest? | It provides an expected completeness boundary. It cannot prove the exporter read every source record or that equal row counts contain the correct contents. |
 | Are marker-last exports atomically ingested? | No. Discovery can span multiple microbatches. Health blocks SQL publication until all observed runs reconcile. |

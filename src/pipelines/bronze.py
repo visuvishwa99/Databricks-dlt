@@ -15,17 +15,19 @@ ROOT = spark.conf.get("export_root").rstrip("/") + "/"  # noqa: F821
 USE_FILE_EVENTS = spark.conf.get("use_managed_file_events", "true").lower() == "true"  # noqa: F821
 
 
-def auto_loader(glob, schema):
+def auto_loader(glob, schema, *, permissive=False):
     reader = (
         spark.readStream.format("cloudFiles")  # noqa: F821
         .option("cloudFiles.format", "json")
         .option("cloudFiles.schemaEvolutionMode", "rescue")
         .option("cloudFiles.allowOverwrites", "false")
         .option("cloudFiles.maxFilesPerTrigger", spark.conf.get("max_files_per_trigger", "1000"))  # noqa: F821
-        .option("mode", "FAILFAST")
+        .option("mode", "PERMISSIVE" if permissive else "FAILFAST")
         .option("pathGlobFilter", glob)
         .schema(schema)
     )
+    if permissive:
+        reader = reader.option("columnNameOfCorruptRecord", "_corrupt_record")
     if USE_FILE_EVENTS:
         reader = reader.option("cloudFiles.useManagedFileEvents", "true")
     return reader.load(ROOT)
@@ -36,7 +38,7 @@ def auto_loader(glob, schema):
     table_properties={"pipelines.reset.allowed": "false"},
 )
 def bronze_student_events():
-    return add_run_metadata(auto_loader("part-*.json", EVENT_SCHEMA)).withColumn(
+    return add_run_metadata(auto_loader("part-*.json", EVENT_SCHEMA, permissive=True)).withColumn(
         "run_id", F.col("path_run_id")
     )
 

@@ -1,8 +1,29 @@
 # Databricks DLT student-events pipeline
 
-A production-oriented portfolio project: immutable JSON exports to Auto Loader, quality controls and AUTO CDC, school-local gold analytics, and an idempotent SQL Server publication protocol. Deployed synthetic data demonstrates the Databricks path; CI exercises real SQL Server transaction behavior. Production acceptance still requires the actual source, networking, identities, load and recovery tests.
+[![Test and deploy Databricks pipeline](https://github.com/visuvishwa99/Databricks-dlt/actions/workflows/ci.yml/badge.svg)](https://github.com/visuvishwa99/Databricks-dlt/actions/workflows/ci.yml)
 
-This is a personal project, not work delivered for Lexia Learning or an employer.
+## Business problem
+
+A student-learning app exports activity documents as immutable JSON files. District reporting needs completions by each school's local day, while a teacher-facing SQL Server app needs each student's latest progress. This project builds a checked path from export to analytics and an atomic SQL Server publication step, including failure handling for incomplete files and job retries.
+
+This is a **personal, synthetic portfolio project**, not work delivered for Lexia Learning or an employer. The [simulated business scenarios](docs/business-problems.md) are learning exercises, and [evidence](docs/evidence.md) records what was actually run.
+
+```mermaid
+flowchart LR
+  A[DocumentDB exporter] --> B[S3 JSON parts and final manifest]
+  B --> C[Auto Loader bronze]
+  C --> D[Clean and quarantine]
+  D --> E[AUTO CDC current documents]
+  E --> F[School-local gold]
+  B --> G[Export reconciliation]
+  G --> H[Health gate]
+  F --> I[SQL staging]
+  H --> I
+  I --> J[Locked SQL transaction and audit]
+  J --> K[Full-row verification]
+```
+
+**Stack:** Databricks Asset Bundles, Lakeflow Declarative Pipelines, Auto Loader, Unity Catalog, PySpark, Delta tables, GitHub Actions, and SQL Server. The demo uses a managed Unity Catalog volume; full environments require S3, school Federation, and a JDBC route.
 
 ## Start here
 
@@ -15,6 +36,8 @@ This is a personal project, not work delivered for Lexia Learning or an employer
 | Prepare infrastructure and access | [Security and infrastructure](docs/security-and-infrastructure.md) |
 | Prepare for interviews | [Interview guide: walkthrough, questions, drills and rubric](docs/interview-guide.md) |
 | See what was actually verified | [Evidence and release gates](docs/evidence.md) |
+| Explore simulated business cases | [Business problems and drills](docs/business-problems.md) |
+| Review student deletion requirements | [Deletion design](docs/data-deletion.md) |
 
 ## Implemented controls
 
@@ -53,6 +76,8 @@ The supplied workspace already contains the synthetic sample. A new deployment m
 - [Successful hardened demo run](https://dbc-7f4188e4-3fd1.cloud.databricks.com/jobs/250557649698066/runs/82045733873178?o=7474652460637329)
 - [GitHub Actions](https://github.com/visuvishwa99/Databricks-dlt/actions)
 
+Workspace links require access to the demonstration workspace. The portable [evidence record](docs/evidence.md) includes run IDs, test results, and pending gates.
+
 ## Verify data and generate exercises
 
 ```shell
@@ -69,3 +94,12 @@ The full dev/prod workflow needs an S3 external location, source contract, feder
 The v1 source contract does not support physical source deletes or partial update images. Gold can be partially refreshed when a pipeline fails; direct BI consumers needing atomic publication require a separate approved snapshot layer. File counts do not replace source reconciliation or checksums. SLOs, peak capacity, regulatory controls and disaster recovery are release gates, not claims established by the small demo.
 
 For interviews, start with the guide, run the drills, and explain the verified results and limits in your own words.
+
+## Key design decisions
+
+- [Triggered ingestion and immutable bronze](docs/architecture.md#adr-1-triggered-file-ingestion-instead-of-continuous-processing)
+- [Source-ordered AUTO CDC](docs/architecture.md#adr-3-scd1-auto-cdc)
+- [Fail-closed quality and publication gates](docs/architecture.md#adr-4-separate-failure-policies)
+- [Atomic SQL Server publication](docs/architecture.md#adr-5-sql-publication-protocol)
+
+The current publication contract is a **full snapshot**. An incremental SQL mode needs a separately tested change-batch and deletion protocol; staging changed keys into the current procedure would be unsafe. Scale and cost numbers will be published only after representative runs, with input cardinality and workspace billing evidence.

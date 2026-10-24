@@ -20,3 +20,10 @@ def test_generator_empty_heartbeat(tmp_path):
     folder = generate(tmp_path, "empty", 0, 10, datetime(2026, 1, 1, tzinfo=UTC))
     assert not list(folder.glob("part-*.json"))
     assert json.loads((folder / "manifest.json").read_text())["file_count"] == 0
+
+
+def test_generator_controls_distinct_student_count(tmp_path):
+    folder = generate(tmp_path, "cardinality", 8, 3, datetime(2026, 1, 1, tzinfo=UTC),
+                      student_cardinality=3)
+    rows = [json.loads(line) for file in folder.glob("part-*.json") for line in file.read_text().splitlines()]
+    assert len({row["student_id"] for row in rows}) == 3

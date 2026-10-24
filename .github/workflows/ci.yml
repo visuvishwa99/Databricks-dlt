@@ -2,9 +2,7 @@ name: Test and deploy Databricks pipeline
 
 on:
   push:
-    paths: ["src/**", "tests/**", "scripts/**", "sql/**", "databricks.yml", "requirements*.txt", "pytest.ini", "ruff.toml", ".github/workflows/**"]
   pull_request:
-    paths: ["src/**", "tests/**", "scripts/**", "sql/**", "databricks.yml", "requirements*.txt", "pytest.ini", "ruff.toml", ".github/workflows/**"]
   workflow_dispatch:
     inputs:
       target:
@@ -91,6 +89,7 @@ jobs:
       BUNDLE_VAR_alert_email: ${{ vars.ALERT_EMAIL }}
       BUNDLE_VAR_run_as_service_principal: ${{ vars.RUN_AS_SERVICE_PRINCIPAL }}
       BUNDLE_VAR_secret_scope: ${{ vars.SECRET_SCOPE || 'sis' }}
+      BUNDLE_VAR_maintenance_secret_scope: ${{ vars.MAINTENANCE_SECRET_SCOPE || 'sis_maintenance' }}
       BUNDLE_VAR_use_managed_file_events: ${{ vars.USE_MANAGED_FILE_EVENTS || 'true' }}
       BUNDLE_VAR_schedule_pause_status: PAUSED
     steps:

@@ -50,7 +50,7 @@ The producer already exports files. Triggered Auto Loader fits that boundary and
 
 ## ADR 2: Bronze retention and explicit schema
 
-Explicit Extended JSON schemas make malformed values observable. Unknown/type-mismatched fields are rescued and rejected from clean data. Syntactically broken JSON fails ingestion; the original S3 object is the replay record. Bronze full refresh is disabled to avoid accidentally destroying the replay boundary. Producer files are immutable; reusing a file path is forbidden. CloudFiles checkpoint progress handles file discovery; source timestamps and CDC handle repeated documents across distinct files. Neither is a distributed exactly-once guarantee across SQL Server.
+Explicit Extended JSON schemas make malformed values observable. Unknown/type-mismatched fields enter `_rescued_data`; syntactically broken event JSON enters `_corrupt_record` in permissive mode. Both remain in bronze and route to quarantine with reason codes. Manifests retain fail-fast parsing because a corrupt completion marker cannot authorize publication. Parseable events with missing identity or unknown schema version still fail the clean flow. Bronze full refresh is disabled to avoid accidentally destroying the replay boundary. Producer files are immutable; reusing a file path is forbidden. CloudFiles checkpoint progress handles file discovery; source timestamps and CDC handle repeated documents across distinct files. Neither is a distributed exactly-once guarantee across SQL Server.
 
 ## ADR 3: SCD1 AUTO CDC
 
@@ -72,7 +72,9 @@ Missing document identity or unknown schema version stops the clean flow. Invali
 6. Update/insert/delete serving rows and append the audit in one transaction. Roll back everything on error.
 7. Compare every serving field with the retained published attempt using multiset differences in both directions.
 
-There is no cross-system transaction spanning Delta and SQL Server. SQL staging is at least once; final publication is idempotent per run ID and atomic within SQL Server. The stale-snapshot fence assumes synchronized driver clocks; a source-issued monotonic snapshot revision is stronger. A crash after commit is resolved by the SQL audit. Orphan staging attempts are harmless but require retention cleanup. Job max_concurrent_runs=1 coordinates normal runs; the database lock also protects against independent publishers. External writers to serving are prohibited by permissions.
+There is no cross-system transaction spanning Delta and SQL Server. SQL staging is at least once; final publication is idempotent per run ID and atomic within SQL Server. The stale-snapshot fence assumes synchronized driver clocks; a source-issued monotonic snapshot revision is stronger. A crash after commit is resolved by the SQL audit. A separate paused maintenance job removes unaudited staging attempts older than seven days under the same SQL application lock; audited attempts remain for reconciliation and recovery. Job max_concurrent_runs=1 coordinates normal runs; the database lock also protects against independent publishers. External writers to serving are prohibited by permissions.
+
+The stored procedure updates only changed serving values. A new run containing the same full snapshot still records its audit but preserves the prior `updated_at`. The procedure requires a complete snapshot; changing to key-only batches needs a distinct protocol with tombstones, source ordering, replay watermarks, and full-state verification.
 
 ## ADR 6: Bundle and promotion
 

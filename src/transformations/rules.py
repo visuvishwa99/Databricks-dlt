@@ -13,8 +13,9 @@ DROP_RULES = {
     "valid_product": "product_name IS NOT NULL AND trim(product_name) <> ''",
     "valid_completion": "is_completed IS NOT NULL",
     "no_rescued_fields": "_rescued_data IS NULL",
+    "no_corrupt_record": "_corrupt_record IS NULL",
     "valid_change_type": (
-        "change_type IN ('ActivityStarted','ActivityIn_Progress',"
+        "change_type IS NOT NULL AND change_type IN ('ActivityStarted','ActivityIn_Progress',"
         "'ActivityCompleted','LevelCompleted','UnitCompleted','StrandCompleted')"
     ),
 }
