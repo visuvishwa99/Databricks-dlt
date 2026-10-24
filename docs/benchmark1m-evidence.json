@@ -1,0 +1,17 @@
+{
+  "result": "PASS",
+  "target": "benchmark1m",
+  "checked_at": "2026-10-24T06:42:54.166969+00:00",
+  "input_rows": 1000000,
+  "input_bytes": 402889000,
+  "bronze_rows": 1000000,
+  "current_rows": 1000000,
+  "gold_students": 10000,
+  "quarantine": 0,
+  "failed_exports": 0,
+  "conflicts": 0,
+  "run_id": 713961166651239,
+  "statement_id": "01f1cf76-2200-1562-89d6-0bd0f2734a9a",
+  "wall_seconds_including_startup": 170.46,
+  "scope": "Single cold pipeline run; excludes PostgreSQL transport, p95, cost and recovery claims"
+}

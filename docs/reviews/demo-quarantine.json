@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "source": "LEXIA:workspace.default:250557649698066",
+  "quarantine": [
+    {
+      "run_id": "corrupt-smoke-20261023-01",
+      "count": 2,
+      "fingerprint": "50f4594fb714785d880530a476f46a0e6a0c0544b5e9b2fa10c55c5163899269",
+      "reviewed_by": "Codex: verified synthetic drill evidence",
+      "reviewed_at": "2026-10-24T06:36:15.925320+00:00",
+      "reason": "Previously verified two-row malformed-input drill; accepted explicitly by the demo threshold of 2. No source business records are discarded by this review."
+    }
+  ]
+}

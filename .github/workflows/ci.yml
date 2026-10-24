@@ -1,0 +1,115 @@
+name: Test and deploy Databricks pipeline
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Environment to deploy
+        type: choice
+        options: [dev, prod]
+        default: dev
+      run_job:
+        description: Run the full job after deployment (requires source and a reachable PostgreSQL server)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - run: python -m pip install -r requirements-dev.txt -r requirements-postgres.txt
+      - run: ruff check .
+      - run: python -m pytest tests --ignore=tests/integration -q --junitxml=test-results/unit.xml
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: unit-test-results
+          path: test-results/
+
+  postgres-integration:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.11"
+      - name: Start disposable PostgreSQL with a generated password
+        shell: bash
+        run: |
+          POSTGRES_PASSWORD=$(openssl rand -hex 24)
+          echo "::add-mask::$POSTGRES_PASSWORD"
+          echo "PGPASSWORD=$POSTGRES_PASSWORD" >> "$GITHUB_ENV"
+          export POSTGRES_PASSWORD
+          docker run -d --name postgres-test -e POSTGRES_PASSWORD -p 127.0.0.1:5432:5432 postgres:18
+          for attempt in $(seq 1 30); do
+            if docker exec postgres-test pg_isready -h 127.0.0.1 -U postgres; then exit 0; fi
+            sleep 2
+          done
+          exit 1
+      - run: python -m pip install pytest -r requirements-postgres.txt
+      - run: python -m pytest tests/integration/test_postgres.py -q --junitxml=test-results/postgres.xml
+        env:
+          RUN_POSTGRES_TESTS: "1"
+          PGHOST: localhost
+          PGUSER: postgres
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: postgres-test-results
+          path: test-results/
+
+  deploy:
+    needs: [check, postgres-integration]
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.ENABLE_AUTO_DEV == 'true') }}
+    runs-on: ubuntu-24.04
+    concurrency:
+      group: lexia-deploy-${{ inputs.target || 'dev' }}
+      cancel-in-progress: false
+    environment: ${{ inputs.target == 'prod' && 'Prod' || 'Dev' }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      TARGET: ${{ inputs.target || 'dev' }}
+      DATABRICKS_AUTH_TYPE: github-oidc
+      DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
+      DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
+      BUNDLE_VAR_catalog: ${{ vars.CATALOG }}
+      BUNDLE_VAR_schema: ${{ vars.SCHEMA }}
+      BUNDLE_VAR_export_root: ${{ vars.EXPORT_ROOT }}
+      BUNDLE_VAR_school_table: ${{ vars.SCHOOL_TABLE }}
+      BUNDLE_VAR_writeback_cluster_id: ${{ vars.WRITEBACK_CLUSTER_ID }}
+      BUNDLE_VAR_alert_email: ${{ vars.ALERT_EMAIL }}
+      BUNDLE_VAR_run_as_service_principal: ${{ vars.RUN_AS_SERVICE_PRINCIPAL }}
+      BUNDLE_VAR_secret_scope: ${{ vars.SECRET_SCOPE || 'sis_postgres' }}
+      BUNDLE_VAR_maintenance_secret_scope: ${{ vars.MAINTENANCE_SECRET_SCOPE || 'sis_postgres_maintenance' }}
+      BUNDLE_VAR_staging_retention_days: ${{ vars.STAGING_RETENTION_DAYS || '7' }}
+      BUNDLE_VAR_cleanup_pause_status: PAUSED
+      BUNDLE_VAR_use_managed_file_events: ${{ vars.USE_MANAGED_FILE_EVENTS || 'true' }}
+      BUNDLE_VAR_schedule_pause_status: PAUSED
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11"
+      - uses: databricks/setup-cli@9b64c94a6d2b2e830592d80e9f14c26d32b42ad7 # v1.20.0
+      - run: python scripts/validate_environment.py --target "$TARGET" --live
+      - run: databricks bundle validate -t "$TARGET" --strict
+      - run: databricks bundle plan -t "$TARGET"
+      - run: databricks bundle deploy -t "$TARGET"
+      - run: databricks bundle summary -t "$TARGET" >> "$GITHUB_STEP_SUMMARY"
+      - if: ${{ inputs.run_job }}
+        run: databricks bundle run -t "$TARGET" student_events_refresh

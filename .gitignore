@@ -1,0 +1,12 @@
+.venv/
+.deps/
+.databricks/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+test-results/
+.coverage
+.env
+*.pem
+*.key
+.generated/
