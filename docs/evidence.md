@@ -1,8 +1,8 @@
 # Verification evidence and production release gates
 
-Evidence date: October 22, 2026 America/Phoenix (October 23 UTC). Results apply to the synthetic demo and disposable CI database, not a production customer workload.
+Evidence updated: October 23, 2026 America/Phoenix (October 24 UTC). Results apply to the synthetic demo and disposable CI database, not a production customer workload.
 
-The Unreleased changes in CHANGELOG.md require a new hosted CI run and workspace demo before their behavior can be added to the verified table below. In particular, malformed-record quarantine, unchanged-row SQL timestamps, and staging cleanup are implemented but are not recorded here as completed workspace or hosted results yet.
+The Unreleased code changes passed the hosted check and SQL integration jobs at commit d13e02c. Malformed-record quarantine was exercised in the demo workspace. The SQL Server cleanup and unchanged-row behavior were exercised only in the disposable CI database; the maintenance job remains paused in full environments.
 
 ## Verified
 
@@ -16,6 +16,9 @@ The Unreleased changes in CHANGELOG.md require a new hosted CI run and workspace
 | Hosted Spark and SQL tests | [Successful CI run 39910065820](https://github.com/visuvishwa99/Databricks-dlt/actions/runs/39910065820): 22 application/contract/generator tests and 8 SQL transaction tests at commit 88281bb |
 | Local Spark | 20 tests passed with local Spark 4.0.1; CI uses pinned Spark 3.5.9 on Python 3.11/Java 17 |
 | SQL replay and failure behavior | Real SQL Server 2022 service: same-run replay, duplicate writes, partial/empty/conflicting stage, stale snapshot, bounded deletion, competing publishers |
+| Current PR CI | [Run 40048902266](https://github.com/visuvishwa99/Databricks-dlt/actions/runs/40048902266), commit d13e02c: check and SQL integration jobs both passed |
+| Updated demo execution | [Job run 702650131595364](https://dbc-7f4188e4-3fd1.cloud.databricks.com/jobs/250557649698066/runs/702650131595364?o=7474652460637329), TERMINATED SUCCESS after parser update |
+| Malformed-input drill | [Job run 829586113643927](https://dbc-7f4188e4-3fd1.cloud.databricks.com/jobs/250557649698066/runs/829586113643927?o=7474652460637329), TERMINATED SUCCESS; [machine-readable result](malformed-drill-evidence.json): four bronze, two current silver, two gold, two quarantined, zero incomplete exports/conflicts. The reason query distinguished `valid_change_type` from `no_corrupt_record`. |
 
 The first hosted lint run failed because the local and hosted Ruff rules differed. Explicit repository rules, pinned tools and import/date fixes resolved it; the subsequent CI run passed. The initial baseline Databricks run failed on module imports; explicit bundle.sourcePath loading fixed the deployed execution context. These are actual debugging examples, not production incidents.
 

@@ -1,0 +1,24 @@
+{
+  "scenario": "synthetic malformed JSON and null change type",
+  "observed_at_utc": "2026-10-24T01:20:24Z",
+  "workspace_id": "7474652460637329",
+  "manifest_run_id": "corrupt-smoke-20261023-01",
+  "job_run_id": "829586113643927",
+  "pipeline_update_id": "a767de7a-5efc-4651-9a98-a90e9d4aeb1c",
+  "smoke_statement_id": "01f1cf49-0c17-10e5-8720-18cde1279e29",
+  "reason_statement_id": "01f1cf49-1a41-1924-844d-f0d4767744b3",
+  "metrics": {
+    "bronze_rows": 4,
+    "current_rows": 2,
+    "daily_rows": 2,
+    "quarantine_rows": 2,
+    "failed_exports": 0,
+    "conflicting_revisions": 0
+  },
+  "new_quarantine_reasons": [
+    {"kind": "parsed-invalid", "valid_change_type": true, "no_corrupt_record": false},
+    {"kind": "malformed-json", "valid_change_type": true, "no_corrupt_record": true}
+  ],
+  "result": "PASS",
+  "scope": "Demo pipeline only; no S3 source, Federation, or external SQL Server publish"
+}

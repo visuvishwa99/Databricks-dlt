@@ -34,7 +34,7 @@ databricks fs cp sample_exports/run_date=2026-10-22/run_id=sample-001/manifest.j
 databricks bundle run -t demo -p LEXIA student_events_refresh
 ```
 
-Upload only into a new run folder; do not overwrite the existing sample. The existing demo already contains it. The fixed sample date makes it unsuitable for the full freshness gate; generate a fresh export for full integration tests.
+Upload only into a new run folder; do not overwrite the existing sample. The existing demo already contains it, plus a synthetic malformed-input drill that leaves two rows in quarantine. Pass `--max-quarantine-rows 2` to the smoke script for this workspace; a new workspace with only the original sample can use the default of zero. The fixed sample date makes it unsuitable for the full freshness gate; generate a fresh export for full integration tests.
 
 ## GitHub environments and multiple workspaces
 

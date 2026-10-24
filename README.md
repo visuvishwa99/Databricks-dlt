@@ -70,10 +70,10 @@ databricks bundle deploy -t demo -p LEXIA
 databricks bundle run -t demo -p LEXIA student_events_refresh
 ```
 
-The supplied workspace already contains the synthetic sample. A new deployment must upload the part file before its manifest; commands are in the deployment guide. The demo deliberately omits external SQL Server/Federation and the fixed sample's freshness gate.
+The supplied workspace already contains the synthetic sample and a two-row quarantine drill. A new deployment must upload each part file before its manifest; commands are in the deployment guide. The demo deliberately omits external SQL Server/Federation and the fixed sample's freshness gate.
 
 - [Live pipeline](https://dbc-7f4188e4-3fd1.cloud.databricks.com/pipelines/070eddb6-9b00-4850-9bea-2a1e83f06755?o=7474652460637329)
-- [Successful hardened demo run](https://dbc-7f4188e4-3fd1.cloud.databricks.com/jobs/250557649698066/runs/82045733873178?o=7474652460637329)
+- [Successful malformed-input drill](https://dbc-7f4188e4-3fd1.cloud.databricks.com/jobs/250557649698066/runs/829586113643927?o=7474652460637329)
 - [GitHub Actions](https://github.com/visuvishwa99/Databricks-dlt/actions)
 
 Workspace links require access to the demonstration workspace. The portable [evidence record](docs/evidence.md) includes run IDs, test results, and pending gates.
@@ -81,7 +81,7 @@ Workspace links require access to the demonstration workspace. The portable [evi
 ## Verify data and generate exercises
 
 ```shell
-python scripts/smoke_test.py --warehouse-id YOUR_WAREHOUSE --catalog workspace --schema default --profile LEXIA --expected-current-rows 2
+python scripts/smoke_test.py --warehouse-id YOUR_WAREHOUSE --catalog workspace --schema default --profile LEXIA --expected-current-rows 2 --max-quarantine-rows 2
 python scripts/generate_export.py --run-id exercise-001 --rows 10000 --rows-per-file 1000
 ```
 
