@@ -182,6 +182,25 @@ The runner initiates all connections from your computer. It does not expose a
 PostgreSQL port publicly. Keep the machine online during a run. This is a manual
 hybrid demonstration, not an unattended cloud production deployment.
 
+### Why this project uses a local runner on Free Edition
+
+This workspace uses **Databricks Free Edition**. It provides serverless compute
+and does not support private networking configurations; outbound internet access
+is also restricted. We cannot configure a private VPN route from this workspace
+to the Windows PostgreSQL instance. See the
+[official Free Edition limitations](https://docs.databricks.com/aws/en/getting-started/free-edition-limitations).
+
+The tested alternative is the local runner: your computer connects to Databricks
+over authenticated HTTPS, retrieves Gold data through the SQL Statements API,
+and writes to PostgreSQL on `localhost:5432`. PostgreSQL is not exposed to the
+internet by this setup. The Databricks connection uses encrypted public internet
+access, not a private network connection. Your computer must stay online while
+the runner executes.
+
+The full dev/prod cloud JDBC deployment described below requires a workspace with
+the necessary compute and networking capabilities; it is not a Free Edition
+deployment path. The Free Edition path is the demo bundle plus the local runner.
+
 ### Install and provision
 
 ```powershell
