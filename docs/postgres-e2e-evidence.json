@@ -2,23 +2,25 @@
   "result": "PASS",
   "mode": "local outbound demo runner",
   "database": "dbx_db",
-  "checked_at": "2026-10-24T06:12:40.046763+00:00",
-  "pipeline_run_id": 981715506262947,
-  "statement_id": "01f1cf71-e523-1780-bf4d-5b1fd1cf7cd9",
-  "publish_run_id": "dbx_981715506262947",
+  "checked_at": "2026-10-24T06:44:56.375375+00:00",
+  "pipeline_run_id": 1006797370445061,
+  "statement_id": "01f1cf76-662f-1b1d-b8f7-0dd04d01a434",
+  "publish_run_id": "dbx_1006797370445061",
   "published_rows": 2,
   "replay_verified_rows": 2,
   "failed_exports": 0,
   "conflicting_revisions": 0,
-  "quarantine_rows": 2,
+  "quarantine_rows": 0,
+  "quarantine_findings": [
+    {
+      "run_id": "corrupt-smoke-20261023-01",
+      "count": 2,
+      "fingerprint": "50f4594fb714785d880530a476f46a0e6a0c0544b5e9b2fa10c55c5163899269"
+    }
+  ],
+  "quarantine_review": "docs/reviews/demo-quarantine.json",
   "limitations": [
     "Synthetic demo; fixed-sample freshness gate not applied",
     "Local runner must remain online; no cloud-to-laptop route verified"
-  ],
-  "permission_checks": {
-    "sis_postgres_direct_delete_denied": true,
-    "sis_postgres_maintenance_direct_delete_denied": true,
-    "maintenance_table_read_denied": true,
-    "maintenance_cleanup_deleted_rows": 0
-  }
+  ]
 }

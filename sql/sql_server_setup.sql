@@ -1,3 +1,4 @@
+-- LEGACY SQL SERVER REFERENCE: not used by the active PostgreSQL bundle or CI.
 -- SQL Server 2017+. Apply with sqlcmd/SSMS as migration owner, never the runtime login.
 -- V2 tables coexist with the earlier demo staging/audit objects. Existing target is preserved.
 IF SCHEMA_ID('stg') IS NULL EXEC('CREATE SCHEMA stg');

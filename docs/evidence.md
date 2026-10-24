@@ -3,15 +3,32 @@
 On October 23, 2026 (America/Phoenix), the synthetic pipeline completed through
 local PostgreSQL publication. See [machine-readable evidence](postgres-e2e-evidence.json).
 
-- Databricks job run: `981715506262947`, SUCCESS.
+- Databricks job run: `1006797370445061`, SUCCESS.
 - Local PostgreSQL `dbx_db`: 2 serving rows, exact reconciliation passed.
 - Same-run replay: passed with 2 rows and one durable audit entry.
-- Source: 0 failed exports, 0 conflicting revisions, 2 expected quarantined rows.
+- Source: 0 failed exports, 0 conflicting revisions, 2 reviewed quarantined rows and 0 unreviewed rows.
 - PostgreSQL integration suite: 17 passed, covering transaction guards,
   exact changes, retention, reconciliation, concurrent replay and temp-table protection.
 - The transport is an outbound local Python runner using the SQL Statements API.
   Direct Databricks JDBC connectivity to Windows is not verified. The fixed-sample
   demo omits the freshness SLA; it is not a production load test.
+
+- API migration: all four pipeline files now use `pyspark.pipelines`; deployed and run successfully.
+- Baseline user verification at ce91443: 25 unit tests and 17 PostgreSQL tests.
+- Current local fast suite: 19 passed, Spark module skipped (12 Spark tests run in CI).
+- New tests cover quarantine review drift/source binding and missing/stale-run detection.
+- Historical test counts below apply only to their named earlier revisions.
+
+## Scale evidence
+
+| Isolated pipeline | Input rows | Gold students | Startup-inclusive wall time | Result |
+| --- | ---: | ---: | ---: | --- |
+| benchmark100k | 100,000 | 10,000 | 149.22 s | PASS |
+| benchmark1m | 1,000,000 | 10,000 | 170.46 s | PASS |
+
+Both runs had zero quarantine, incomplete exports and CDC conflicts. See
+[100k evidence](benchmark100k-evidence.json) and [1M evidence](benchmark1m-evidence.json).
+These are single synthetic input runs, not p95, PostgreSQL transport or cost measurements.
 
 The records below are historical and describe earlier SQL Server work.
 
@@ -31,9 +48,9 @@ The Unreleased code changes passed the hosted check and SQL integration jobs at 
 | Earlier baseline execution | Run 167012210378212, two bronze/current silver/daily gold rows, zero quarantine, one OK manifest |
 | Workspace data checks | [Machine-readable smoke evidence](demo-smoke-evidence.json), produced by scripts/smoke_test.py |
 | Hosted Spark and SQL tests | [Successful CI run 39910065820](https://github.com/visuvishwa99/Databricks-dlt/actions/runs/39910065820): 22 application/contract/generator tests and 8 SQL transaction tests at commit 88281bb |
-| Local Spark | 20 tests passed with local Spark 4.0.1; CI uses pinned Spark 3.5.9 on Python 3.11/Java 17 |
+| Historical local Spark (pre-PostgreSQL) | Earlier 20-test run with local Spark 4.0.1; CI uses pinned Spark 3.5.9 on Python 3.11/Java 17 |
 | SQL replay and failure behavior | Real SQL Server 2022 service: same-run replay, duplicate writes, partial/empty/conflicting stage, stale snapshot, bounded deletion, competing publishers |
-| Current PR CI | [Run 40048902266](https://github.com/visuvishwa99/Databricks-dlt/actions/runs/40048902266), commit d13e02c: check and SQL integration jobs both passed |
+| Historical PR CI | [Run 40048902266](https://github.com/visuvishwa99/Databricks-dlt/actions/runs/40048902266), commit d13e02c: check and SQL integration jobs both passed |
 | Updated demo execution | [Job run 702650131595364](https://dbc-7f4188e4-3fd1.cloud.databricks.com/jobs/250557649698066/runs/702650131595364?o=7474652460637329), TERMINATED SUCCESS after parser update |
 | Malformed-input drill | [Job run 829586113643927](https://dbc-7f4188e4-3fd1.cloud.databricks.com/jobs/250557649698066/runs/829586113643927?o=7474652460637329), TERMINATED SUCCESS; [machine-readable result](malformed-drill-evidence.json): four bronze, two current silver, two gold, two quarantined, zero incomplete exports/conflicts. The reason query distinguished `valid_change_type` from `no_corrupt_record`. |
 

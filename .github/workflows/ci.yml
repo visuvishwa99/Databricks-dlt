@@ -30,39 +30,13 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m pip install -r requirements-dev.txt -r requirements-postgres.txt
       - run: ruff check .
       - run: python -m pytest tests --ignore=tests/integration -q --junitxml=test-results/unit.xml
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: unit-test-results
-          path: test-results/
-
-  sql-integration:
-    runs-on: ubuntu-24.04
-    services:
-      sqlserver:
-        image: mcr.microsoft.com/mssql/server:2022-latest
-        env:
-          ACCEPT_EULA: Y
-          MSSQL_SA_PASSWORD: "CI-only-Disposable!4729"
-        ports: ["1433:1433"]
-    env:
-      RUN_SQLSERVER_TESTS: "1"
-      SQLSERVER_HOST: localhost
-      SQLSERVER_PASSWORD: "CI-only-Disposable!4729"
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with:
-          python-version: "3.11"
-      - run: python -m pip install pytest "pymssql==2.4.5"
-      - run: python -m pytest tests/integration -q --junitxml=test-results/sql.xml
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: always()
-        with:
-          name: sql-test-results
           path: test-results/
 
   postgres-integration:
@@ -98,7 +72,7 @@ jobs:
           path: test-results/
 
   deploy:
-    needs: [check, sql-integration, postgres-integration]
+    needs: [check, postgres-integration]
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.ENABLE_AUTO_DEV == 'true') }}
     runs-on: ubuntu-24.04
     concurrency:

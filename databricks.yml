@@ -14,7 +14,6 @@ sync:
     - CHANGELOG.md
     - requirements-dev.txt
     - requirements-postgres.txt
-    - compose.yaml
     - pytest.ini
     - ruff.toml
 
@@ -54,6 +53,8 @@ variables:
   schedule_pause_status:
     default: PAUSED
   cleanup_pause_status:
+    default: PAUSED
+  monitor_pause_status:
     default: PAUSED
   alert_email:
     default: REPLACE_WITH_ALERT_EMAIL
@@ -95,6 +96,7 @@ targets:
       export_root: /Volumes/workspace/default/lexia_sample_exports/student_events/
       school_table: __sample__
       use_managed_file_events: "false"
+      alert_email: visuvishwa619@gmail.com
     resources:
       volumes:
         sample_exports:
@@ -115,6 +117,26 @@ targets:
             - task_key: refresh_pipeline
               pipeline_task:
                 pipeline_id: ${resources.pipelines.student_events.id}
+        publish_no_run_monitor:
+          name: demo-postgres-no-run-monitor
+          max_concurrent_runs: 1
+          email_notifications:
+            on_failure:
+              - ${var.alert_email}
+          schedule:
+            quartz_cron_expression: "0 0/15 6-18 ? * MON-FRI"
+            timezone_id: America/Phoenix
+            pause_status: ${var.monitor_pause_status}
+          tasks:
+            - task_key: check_publication
+              timeout_seconds: 600
+              notebook_task:
+                notebook_path: ./src/jobs/monitor_publish_notebook.py
+                base_parameters:
+                  catalog: ${var.catalog}
+                  schema: ${var.schema}
+                  publisher_job_id: "${resources.jobs.student_events_refresh.id}"
+                  max_age_minutes: "60"
   dev:
     default: true
     mode: development
@@ -249,3 +271,29 @@ targets:
       jobs:
         student_events_refresh: *full_refresh_job
         staging_cleanup: *staging_cleanup_job
+
+  benchmark100k: &benchmark_target
+    mode: development
+    variables:
+      catalog: workspace
+      schema: dbx_benchmark100k
+      export_root: /Volumes/workspace/default/lexia_sample_exports/benchmark100k/
+      school_table: __sample__
+      use_managed_file_events: "false"
+    resources:
+      jobs:
+        student_events_refresh:
+          name: ${bundle.target}-student-events-refresh
+          max_concurrent_runs: 1
+          tasks:
+            - task_key: refresh_pipeline
+              pipeline_task:
+                pipeline_id: ${resources.pipelines.student_events.id}
+  benchmark1m:
+    <<: *benchmark_target
+    variables:
+      catalog: workspace
+      schema: dbx_benchmark1m
+      export_root: /Volumes/workspace/default/lexia_sample_exports/benchmark1m/
+      school_table: __sample__
+      use_managed_file_events: "false"

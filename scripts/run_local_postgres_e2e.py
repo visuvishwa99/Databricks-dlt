@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import psycopg
+from health_reviews import unreviewed_quarantine
 from workspace_cli import cli, secret
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src/jobs"))
@@ -39,7 +40,7 @@ def statement(profile, warehouse, query):
         if not link.startswith(f"/api/2.0/sql/statements/{response['statement_id']}/result/chunks/"):
             raise RuntimeError("Unexpected SQL chunk location")
         chunk = cli(profile, "api", "get", link)
-    if len(rows) != response["manifest"]["total_row_count"]:
+    if len(rows) != response.get("manifest", {}).get("total_row_count", 0):
         raise RuntimeError("Incomplete SQL result")
     return rows, response["statement_id"]
 
@@ -53,6 +54,7 @@ def main():
     p.add_argument("--schema", default="default")
     p.add_argument("--max-rows", type=int, default=100000)
     p.add_argument("--max-quarantine-rows", type=int, default=0)
+    p.add_argument("--quarantine-review", help="JSON with exact, operator-reviewed quarantine fingerprints")
     p.add_argument("--secret-scope", default="sis_postgres")
     p.add_argument("--output", default=".generated/postgres-e2e.json")
     args = p.parse_args()
@@ -75,12 +77,21 @@ def main():
     prefix = f"`{args.catalog}`.`{args.schema}`"
     health, _ = statement(args.profile, args.warehouse_id, f"""
       SELECT (SELECT count(*) FROM {prefix}.ops_export_reconciliation WHERE status <> 'OK' OR status IS NULL),
-             (SELECT count(*) FROM {prefix}.ops_cdc_conflicts),
-             (SELECT count(*) FROM {prefix}.silver_quarantine_events)
+             (SELECT count(*) FROM {prefix}.ops_cdc_conflicts)
     """)
-    failed, conflicts, quarantine = map(int, health[0])
+    failed, conflicts = map(int, health[0])
+    quarantine_rows, _ = statement(args.profile, args.warehouse_id, f"""
+      SELECT run_id, count(*),
+        sha2(concat_ws(',', sort_array(collect_list(sha2(to_json(struct(q.*)), 256)))), 256)
+      FROM {prefix}.silver_quarantine_events q GROUP BY run_id
+    """)
+    quarantine, findings = unreviewed_quarantine(
+        quarantine_rows, args.quarantine_review,
+        f"{args.profile}:{args.catalog}.{args.schema}:{args.job_id}",
+    )
     if failed or conflicts or quarantine > args.max_quarantine_rows:
-        raise RuntimeError("Source quality gate failed")
+        raise RuntimeError(f"Source quality gate failed: failed_exports={failed}, conflicts={conflicts}, "
+                           f"unreviewed_quarantine={quarantine}; quarantine fingerprints={findings}")
     snapshot_at = datetime.now(UTC)
     rows, statement_id = statement(args.profile, args.warehouse_id,
                                   f"SELECT {', '.join(PROGRESS_COLUMNS)} FROM {namespace} LIMIT {args.max_rows+1}")
@@ -105,11 +116,20 @@ def main():
     # Exercise retry-after-commit behavior without modifying the published snapshot.
     publish(options, run_id, attempt, len(rows), snapshot_at)
     replay_verified = reconcile(options, run_id)
+    # Cloud monitor can detect a missing local publisher without connecting to the laptop.
+    statement(args.profile, args.warehouse_id, f"""CREATE TABLE IF NOT EXISTS {prefix}.ops_publish_heartbeat
+      (job_id STRING, publish_run_id STRING, reconciled_at TIMESTAMP, published_rows BIGINT) USING DELTA""")
+    statement(args.profile, args.warehouse_id, f"""MERGE INTO {prefix}.ops_publish_heartbeat t
+      USING (SELECT '{args.job_id}' job_id, '{run_id}' publish_run_id,
+                    current_timestamp() reconciled_at, {verified} published_rows) s
+      ON t.job_id=s.job_id
+      WHEN MATCHED THEN UPDATE SET * WHEN NOT MATCHED THEN INSERT *""")
     report = {"result": "PASS", "mode": "local outbound demo runner", "database": "dbx_db",
               "checked_at": datetime.now(UTC).isoformat(), "pipeline_run_id": run["run_id"],
               "statement_id": statement_id, "publish_run_id": run_id, "published_rows": verified,
               "replay_verified_rows": replay_verified, "failed_exports": failed,
               "conflicting_revisions": conflicts, "quarantine_rows": quarantine,
+              "quarantine_findings": findings, "quarantine_review": args.quarantine_review,
               "limitations": ["Synthetic demo; fixed-sample freshness gate not applied",
                               "Local runner must remain online; no cloud-to-laptop route verified"]}
     output = Path(args.output)

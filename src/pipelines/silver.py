@@ -2,8 +2,8 @@
 
 import sys
 
-import dlt
-from pyspark.sql import functions as F
+from pyspark import pipelines as dp
+from pyspark.sql import functions as F  # noqa: F821
 
 sys.path.insert(0, spark.conf.get("bundle.sourcePath"))  # noqa: F821
 
@@ -12,28 +12,28 @@ from transformations.rules import DROP_ALL, DROP_RULES, FAIL_RULES, WARN_RULES
 
 
 def parsed():
-    return unwrap_extended_json(dlt.read_stream("bronze_student_events"))
+    return unwrap_extended_json(spark.readStream.table("bronze_student_events"))  # noqa: F821
 
 
-@dlt.table(name="silver_student_events_clean")
-@dlt.expect_all_or_fail(FAIL_RULES)
-@dlt.expect_all_or_drop(DROP_RULES)
-@dlt.expect_all(WARN_RULES)
+@dp.table(name="silver_student_events_clean")
+@dp.expect_all_or_fail(FAIL_RULES)
+@dp.expect_all_or_drop(DROP_RULES)
+@dp.expect_all(WARN_RULES)
 def silver_student_events_clean():
     # Unparseable JSON has no reliable document ID and belongs in quarantine.
     # Keep the fail expectation for parseable records with a missing ID.
     return parsed().where("_corrupt_record IS NULL")
 
 
-@dlt.table(name="silver_quarantine_events")
+@dp.table(name="silver_quarantine_events")
 def silver_quarantine_events():
     return quarantine_reasons(parsed(), DROP_RULES).where(f"NOT coalesce(({DROP_ALL}), false)").withColumn(
         "quarantined_at", F.current_timestamp()
     )
 
 
-dlt.create_streaming_table("silver_student_events")
-dlt.create_auto_cdc_flow(
+dp.create_streaming_table("silver_student_events")
+dp.create_auto_cdc_flow(
     target="silver_student_events",
     source="silver_student_events_clean",
     keys=["_id"],
@@ -42,9 +42,9 @@ dlt.create_auto_cdc_flow(
 )
 
 
-@dlt.table(name="silver_school_dim")
-@dlt.expect_or_fail("consistent_school_metadata", "metadata_versions = 1")
-@dlt.expect_or_fail("complete_school", "school_id IS NOT NULL AND school_tz IS NOT NULL")
+@dp.materialized_view(name="silver_school_dim")
+@dp.expect_or_fail("consistent_school_metadata", "metadata_versions = 1")
+@dp.expect_or_fail("complete_school", "school_id IS NOT NULL AND school_tz IS NOT NULL")
 def silver_school_dim():
     if spark.conf.get("school_table") == "__sample__":  # noqa: F821
         return spark.sql(  # noqa: F821

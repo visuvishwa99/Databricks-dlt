@@ -1,3 +1,4 @@
+# LEGACY SQL SERVER REFERENCE: not used by the active PostgreSQL bundle or CI.
 """Remove old unaudited SQL staging attempts with a maintenance identity."""
 
 import argparse

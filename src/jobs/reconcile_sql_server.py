@@ -1,3 +1,4 @@
+# LEGACY SQL SERVER REFERENCE: not used by the active PostgreSQL bundle or CI.
 """Compare every serving field with the exact snapshot recorded for this run."""
 
 import argparse

@@ -1,3 +1,4 @@
+# LEGACY SQL SERVER REFERENCE: not used by the active PostgreSQL bundle or CI.
 """Stage a gold snapshot and invoke the idempotent SQL Server merge procedure.
 
 Run on a dedicated Databricks cluster with the Microsoft SQL Server JDBC driver.

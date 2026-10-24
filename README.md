@@ -46,7 +46,7 @@ flowchart LR
 - SCD1 current documents, source revision conflict detection and timezone-aware business aggregates.
 - SQL staging isolated by run/attempt, expected-count checks, duplicate retry handling, transaction lock, stale-snapshot fencing, audit-based replay, guarded deletion and full-field verification.
 - Host-independent Databricks bundle with demo/dev/prod targets, production runtime principal, bounded retries/timeouts, failure notification configuration and paused schedules.
-- GitHub Actions with pinned tools/actions, Spark tests, PostgreSQL and legacy SQL Server failure tests, OIDC deployment and environment preflight.
+- GitHub Actions with pinned tools/actions, Spark tests, PostgreSQL failure tests, OIDC deployment and environment preflight.
 - Synthetic export generator, reusable workspace smoke check, monitoring queries, recovery/rollback procedures and interview exercises.
 
 ## Create Databricks secrets for local PostgreSQL
@@ -217,14 +217,14 @@ Use this provisioning script only for the dedicated local development database.
 ### Run the complete demo
 
 ```powershell
-python scripts/run_local_postgres_e2e.py --profile LEXIA --warehouse-id d08c221c286f4b39 --job-id 250557649698066 --max-quarantine-rows 2 --output .generated/postgres-e2e.json
+python scripts/run_local_postgres_e2e.py --profile LEXIA --warehouse-id d08c221c286f4b39 --job-id 250557649698066 --quarantine-review docs/reviews/demo-quarantine.json --output .generated/postgres-e2e.json
 ```
 
 The command refreshes the pipeline, waits for success, checks export completeness,
 CDC conflicts and quarantine count, retrieves a bounded Gold snapshot, stages it,
 publishes atomically, verifies every field, and retries the same run to verify
-idempotency. The two permitted quarantine rows are the existing malformed-input
-drill. Fixed historical samples do not pass a production freshness SLA; the demo
+idempotency. The two existing malformed-input drill rows are explicitly reviewed in
+`docs/reviews/demo-quarantine.json`; the default unreviewed threshold is zero. Fixed historical samples do not pass a production freshness SLA; the demo
 runner explicitly omits that check. The full cloud workflow retains its health gate.
 
 The runner rejects empty, duplicate-key, oversized, incomplete and truncated
@@ -235,9 +235,9 @@ transaction advisory lock and stale snapshots fail.
 ### Verified result
 
 The [recorded end-to-end run](docs/postgres-e2e-evidence.json) passed on October 23,
-2026 (America/Phoenix): pipeline run `981715506262947`, **2 published rows**, full-field
+2026 (America/Phoenix): pipeline run `1006797370445061`, **2 published rows**, full-field
 reconciliation and replay passed, **0 failed exports**, **0 CDC conflicts**, and
-**2 expected quarantine rows**. Evidence timestamps use UTC. The PostgreSQL
+**2 reviewed quarantine rows and 0 unreviewed rows**. Evidence timestamps use UTC. The PostgreSQL
 transaction suite also passed locally; details are in [evidence](docs/evidence.md).
 
 ### Retention and access
@@ -262,9 +262,54 @@ file on compute. Set `host`, `port`, `database`, `user`, `password`, and
 The demo bundle remains a pipeline-only refresh job; the local runner orchestrates
 its PostgreSQL follow-up. No cloud JDBC connection to this laptop is claimed.
 GitHub Actions includes a PostgreSQL 18 integration job with a generated temporary
-password and disposable test databases. Existing SQL Server tests cover the legacy
-implementation. The PostgreSQL tests exercise replay, null/case/space corrections,
+password and disposable test databases. SQL Server files are marked legacy reference code and are excluded from active
+CI/deployment dependencies. The PostgreSQL tests exercise replay, null/case/space corrections,
 rollback guards, deletion thresholds, retention and reconciliation failure.
+
+## Review, governance, monitoring and benchmarks
+
+**Quarantine review:** `--quarantine-review` accepts a JSON file scoped to the
+profile, namespace and job. Each record requires source run ID, row count,
+content fingerprint, reviewer, timestamp and reason. The gate reports these
+fingerprints when it fails. A count or content change invalidates the old review;
+unknown runs still count against the threshold. Review only after investigation.
+The sample review covers the previously accepted synthetic malformed-input drill.
+
+Incomplete exports and CDC conflicts still block the full snapshot until repaired.
+Filtering them merely to the newest job would silently allow incomplete history
+into Gold. Restore missing immutable parts/manifests or correct the conflicting
+source revision; a quarantine review never bypasses those gates.
+
+**Governance:** `sql/unity_catalog_governance.sql` provides grants, a student-ID
+mask, and school entitlement row filters. It is an unapplied environment template:
+replace tokens, confirm feature eligibility, configure real principals and school
+entitlements, then test denied/allowed users and the pipeline publisher. No
+production governance claim is made for the single-user Free Edition demo.
+
+**Monitor/dashboard:** run independently of publication:
+
+```powershell
+python scripts/monitor_postgres.py --max-age-minutes 60 --output .generated/monitor.html
+```
+
+This writes an HTML snapshot dashboard and JSON status, returning exit code 2 for
+missing/stale/unreconciled publication or an unreachable database. An external
+scheduler must run it during the intended service hours and route failures to a
+real recipient. The independent Databricks job `publish_no_run_monitor` is configured to email
+`visuvishwa619@gmail.com` on failure. Its schedule stays paused until publication
+is scheduled. Email receipt has not been verified;
+running a monitor only after a successful publisher would not detect missing runs.
+The local runner writes `ops_publish_heartbeat` only after PostgreSQL reconciliation;
+the cloud job can therefore detect a stopped laptop without reaching PostgreSQL.
+
+**Scale:** isolated `benchmark100k` and `benchmark1m` bundle targets use separate
+schemas and prefixes. Generate exports with `scripts/generate_export.py` under
+`.generated/<target>`, using 100,000 or 1,000,000 rows and student cardinality
+10,000, then run `scripts/run_scale_benchmark.py --target <target> --warehouse-id <id>`.
+The script uploads parts before the manifest, deploys the isolated target, runs
+the pipeline and records row counts and wall time. See the checked-in `docs/benchmark100k-evidence.json` and
+`docs/benchmark1m-evidence.json` for completed runs. These are pipeline-input
+benchmarks, not PostgreSQL throughput, p95 latency or production capacity claims.
 
 ## Run tests
 

@@ -2,8 +2,8 @@
 
 import sys
 
-import dlt
-from pyspark.sql import functions as F
+from pyspark import pipelines as dp
+from pyspark.sql import functions as F  # noqa: F821
 
 sys.path.insert(0, spark.conf.get("bundle.sourcePath"))  # noqa: F821
 
@@ -33,7 +33,7 @@ def auto_loader(glob, schema, *, permissive=False):
     return reader.load(ROOT)
 
 
-@dlt.table(
+@dp.table(
     name="bronze_student_events",
     table_properties={"pipelines.reset.allowed": "false"},
 )
@@ -43,10 +43,10 @@ def bronze_student_events():
     )
 
 
-@dlt.table(
+@dp.table(
     name="bronze_export_manifests",
     table_properties={"pipelines.reset.allowed": "false"},
 )
-@dlt.expect_all_or_fail(MANIFEST_RULES)
+@dp.expect_all_or_fail(MANIFEST_RULES)
 def bronze_export_manifests():
     return add_run_metadata(auto_loader("manifest.json", MANIFEST_SCHEMA))
